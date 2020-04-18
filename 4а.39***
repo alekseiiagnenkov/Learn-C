@@ -166,7 +166,11 @@ int F2_Generate(Table* T, Item* delitem)
 {
     int key1, key2, n, flag1 = 0, j = 0, w, t, k2;
     int m;
-
+    //Если таблица полная, то выходим
+    if (T->count == SIZE) {
+        printf("Table is full.\n");
+        return 0;
+    }
     printf("\nMax size of table:%d", SIZE);
 
     //Определяем сколько элементов хотим добавить
@@ -284,10 +288,9 @@ int F3_Input(Table* T,  Item* delitem)
         }
     } while (n > SIZE || n < 0);
 
-    Item* I = (Item*)calloc(n,sizeof(Item));
-
-    for (int i=0; i < n; i++,I++)
+    for (int i=0; i < n; i++)
     {
+        Item* I = (Item*)calloc(1, sizeof(Item));
         I->info = (char*)calloc(1, sizeof(char));
 
         //info
@@ -352,7 +355,7 @@ int F3_Input(Table* T,  Item* delitem)
 //- удаление из таблицы элемента, заданного каким - либо одним ключом                                    +
 int F4_DeleteRelease(Table* T, Item* delitem)
 {
-    int i = 0, res, key2, key;
+    int i = 0, res, key2, key, flag=0;
 
     if (T->count == 0) {
         printf("\nTable is free.\n");
@@ -369,23 +372,39 @@ int F4_DeleteRelease(Table* T, Item* delitem)
 
     if (key == 1)
     {
+
         printf("\nEnter key: ");
         getInt(&key);        
 
 
         //проходимся по всем элементам в открытом массиве, пока не найдем нужный
-        while (T->arr1[i].arr->key1 != key)
+        //while (T->arr1[i].arr->key1 != key)
+        //{
+        //    i++;
+        //    if (T->arr1[i].arr==NULL)
+        //    {
+        //        printf("The key is not found.\n");
+        //        return 0;
+        //    }
+        //}
+
+        for (i=0;i<SIZE;i++)
+        if (T->arr1[i].arr != NULL)
         {
-            i++;
-            if (T->arr1[i].arr==NULL)
+            if (T->arr1[i].arr->key1 == key)
             {
-                printf("The key is not found.\n");
-                return 0;
+                flag = 1;
+                break;
             }
         }
+        if (flag == 0)
+        {
+            printf("The key is not found.\n");
+            return 0;
+        }
 
-        key2 = T->arr2[i-1].arr->key2;
-        while (T->arr2[hash(&key2, SIZE)].arr->key2 != T->arr2[i-1].arr->key2)
+        key2 = T->arr1[i].arr->key2;
+        while (T->arr2[hash(&key2, SIZE)].arr->key2 != T->arr1[i].arr->key2)
             key2++;
 
         free(T->arr1[i].arr->info);
@@ -442,7 +461,7 @@ int F5_Print(Table* T, Item* delitem)
     return 0;
 }
 
-/*- поиск в таблице элемента по любому заданному ключу; Результатом поиска должна быть копия найденного
+/*- поиск в таблице элемента по любому заданному ключу; Результатом поиска должна быть копия найденного  +
 элемента со значениями всех ключей;*/
 int F6_FindKey(Table* T, int* a)
 {
