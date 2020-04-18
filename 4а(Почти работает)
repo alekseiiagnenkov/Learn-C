@@ -1,0 +1,695 @@
+/* 39 вариант ***
+Написать программу для работы с таблицей, использующей два пространства ключей, по запросам оператора.
+Каждый элемент таблицы имеет следующую структуру :
+
+struct Item {
+	int key1;     ключ элемента из 1-го пространства ключей;
+	int key2;     ключ элемента из 2-го пространства ключей;
+	char* info;   указатель на информацию;
+};
+
+Первое пространство ключей организовано по принципу просматриваемой таблицы, второе - перемешенной 
+таблицы, использующей перемешиваение сложением. Максимальный размер таблицы ограничен (для задания
+максимального размера таблицы использовать константу - например const int SIZE = ...;).
+
+Предусмотреть следующие операции:
+- включение нового элемента в таблицу при условии, что в таблице не может быть двух элементов
+с одинаковыми ключами. 
+- удаление из таблицы элемента, заданного каким - либо одним ключом;
+- поиск в таблице элемента по любому заданному ключу; Результатом поиска должна быть копия найденного
+элемента со значениями всех ключей;
+- вывод содержимого таблицы на экран; при этом формат вывода должен соответсвовать приведенной выше 
+структуре элемента таблицы.
+
+Разработать два варианта программы:
+a)	и сама таблица, и информация, относящаяся к элементу таблицы, хранятся в основной памяти;
+b)	и сама таблица, и информация, относящаяся к элементу таблицы, хранятся во внешней памяти
+(используется двоичный файл произвольного доступа). Все операции выполняются с таблицей,
+размещенной в основной памяти. Таблица считывается из файла (или создается в первый раз) в начале
+сеанса работы и записывается в файл в конце сеанса работы. Информация, относящаяся к элементу
+таблицы, записывается в файл сразу же при выполнении операции включения в таблицу. Имя файла
+вводится по запросу из программы.
+
+Примечания:
+1. Программа должна содержать несколько функций; функция main должна выполнять:
+вывод меню, ввод и анализ ответа, вызов на исполнение требуемой функции;
+2. В программе нужно предусмотреть проверку правильности ввода данных;
+3. Для варианта b) следует модифицировать структуру, определяющую элемент таблицы, включив в нее
+длину информации и ее смещение в файле;
+4. В варианте b) для работы с файлом использовать функции пакета stdio.h;
+чтение и запись выполнять с помощью fread() и fwrite(), в которых должна быть указана реальная
+длина информации.
+*/
+
+#define _CRT_SECURE_NO_WARNINGS
+#define SIZE 10
+#include <stdio.h>
+#include <malloc.h>
+#include <string.h>
+#include <time.h>
+#include <stdlib.h>
+
+/*Максимальный размер таблицы ограничен(для задания максимального размера таблицы использовать константу -
+например const int SIZE = ...;).*/
+//const int SIZE = 10; //максимальны размер таблицы
+
+//структура элемента таблицы;
+typedef struct Item {
+    int key1;     //ключ элемента из 1 - го пространства ключей;
+    int key2;     //ключ элемента из 2 - го пространства ключей;
+    char* info;   //указатель на информацию;
+}Item;
+
+typedef struct ARR {
+    int busy;     //состояние элемента
+    Item* arr;    //указатель на Item
+}ARR;
+
+//структура - таблица
+typedef struct Table {
+    int size;     //максимальный размер таблицы
+    int count;    //текущий размер таблицы
+    ARR* arr1;    //указатель на 1 массив ARR
+    ARR* arr2;    //указатель на 2 массив ARR
+}Table;
+
+//строки меню
+const char* msgs[] = { NULL, "Exit programm", "Generate random table", "Input item", "Delete releases", "Print table", "Find key"};
+
+//меню
+int F0_Menu();                         //меню
+int F1_End(Table*, Item*);             //функция выхода
+int F2_Generate(Table*, Item*);        //генерация рандомных значений в таблице
+int F3_Input(Table*, Item*);           //ввод элемента
+int F4_DeleteRelease(Table*, Item*);   //удаление элемента
+int F5_Print(Table*, Item*);           //вывод элементов
+int F6_FindKey(Table*, Item*);         //поиск и копирование элемента
+
+//функции работы с таблицей
+Table* TableCreate(int);               //функция создания пустой таблицы
+void TableDelete(Table*,Item*);        //удаление таблицы
+void TablePrint(Table*, Item*);        //вывод таблицы
+int hash(int*, int);                   //определение ключа 2
+void DelItem(Item*);                   //удаление элемента
+int ItemPrint(Item*);                  //вывод элемента таблицы
+
+//Функции ввода
+int getInt(int*);                      //чтение целого числа
+int getStr(Item*);                     //функция ввода строк
+ 
+/*1. Программа должна содержать несколько функций; функция main должна выполнять:                        +      F4_DeleteRelease-ошибка в открытом массиве
+вывод меню, ввод и анализ ответа, вызов на исполнение требуемой функции;*/
+int main() {
+    int  menu=0, ex=0, nomber=0;                                                    
+    int(*fun1[]) (Table*,Item*) = { NULL, F1_End, F2_Generate, F3_Input, F4_DeleteRelease, F5_Print, F6_FindKey};  //массив функций для 1 таблицы
+
+    //Удаленный элемент
+    Item* delitem = (Item*)calloc(1,sizeof(Item));
+    delitem->key1 = 0;
+    delitem->key2 = 0;
+    delitem->info = NULL;
+
+    //Выделяю память под таблицу
+    Table* T=TableCreate(SIZE); 
+    delitem->info = NULL;
+    if (T == NULL) 
+    {
+        puts("Out of memory");
+        return 0;
+    }
+
+    F0_Menu();
+                                                            
+    //выбор пункта меню
+    while (ex != 1)
+    {
+        menu = -1;                        
+        while (menu <= -1 || menu >= 7)
+        {
+            printf("Selected action (0 - Menu): ");
+            getInt(&menu);	                      //чтение номера пункта меню
+            if (menu <= -1 || menu >= 7) {        //обнаружен неверный номер - ошибка
+                printf("Error!\n");
+                scanf_s("%*[^\n]");
+            }
+        }
+        
+        if (menu == 0)
+            F0_Menu();
+        else
+        {
+            ex = (*fun1[menu])(T,delitem);
+        }
+    }
+    return 0;
+}
+
+//вывод меню                                                                                             +
+int F0_Menu()
+{
+    printf("\n      MENU\nMax size of table:%d\n", SIZE);
+    int i;
+    for (i = 1; i < 7; ++i)
+        printf("%d %s\n", i, msgs[i]);
+    return 0;
+}
+
+//завершение программы                                                                                   +
+int F1_End(Table* T, Item* delitem)
+{
+    TableDelete(T,delitem);
+    return 1;
+}
+
+//добавление случайных элементов                                                                         +
+int F2_Generate(Table* T, Item* delitem)
+{
+    int key1, key2, n, flag1 = 0, j = 0, w, t, k2;
+    int m;
+
+    printf("\nMax size of table:%d", SIZE);
+
+    //Определяем сколько элементов хотим добавить
+    do
+    {
+        printf("\nHow many elements do you want to add?\nEnter:");
+        getInt(&n);
+        if (n == 0)
+            return 0;
+        if (n > SIZE || n < 0)
+            printf("Error!\n");
+        else
+            if (n > (SIZE - T->count))
+            {
+                printf("You can only add %d characters.", (SIZE - T->count));
+                n = SIZE - T->count;
+            }
+    } while (n > SIZE || n < 0);
+
+
+    for (int i = 0; i < n; i++)
+    {
+        Item* I = (Item*)calloc(1, sizeof(Item));
+        I->info = (char*)calloc(4, sizeof(char));
+
+        //info
+        for (t = 0; t < 3; t++)
+        {
+            m = rand() % 10;
+            I->info[t] = '0' + m;
+        }
+        I->info[3] = '\0';
+
+        //key1
+        do
+        {
+            key1= rand() % 1000;
+            flag1 = 0;
+            for (int y = 0; y < T->size; y++)
+                if (T->count >= 1 && T->arr1[y].arr != NULL)
+                    if (T->arr1[y].arr->key1 == key1)
+                    {
+                        flag1 = 1;
+                    }
+        } while (flag1 == 1);
+
+        //key2
+        do
+        {
+            key2 = rand() % 1000;
+            flag1 = 0;
+            k2 = key2;
+            while (T->arr2[hash(&k2, SIZE)].arr != NULL)
+            {
+                if (T->arr2[hash(&k2, SIZE)].arr->key2 == key2)
+                {
+                    flag1 = 1;
+                }
+                k2++;
+            }
+        } while (flag1 == 1);
+
+        //Запись информации в таблицу
+        I->key1 = key1;
+        I->key2 = key2;
+
+        //Заполнение таблицы
+        T->count++;
+              //Добавляем в первый массив
+        while (T->arr1[j].arr != NULL)
+            j++;
+        T->arr1[j].arr = I;
+        T->arr1[j].busy = 1;
+        j = 0;
+        //Добавляем во второй массив
+        while (T->arr2[hash(&key2, SIZE)].arr == delitem || T->arr2[hash(&key2, SIZE)].arr != NULL)
+            key2 = key2++;
+        T->arr2[hash(&key2, SIZE)].arr = I;
+        T->arr2[hash(&key2, SIZE)].busy = 1;
+
+    }
+    printf("Success. Added %d elements.\n", n);
+    T -> count = n;
+    return 0;
+} 
+
+/*-включение нового элемента в таблицу при условии, что в таблице не может быть двух элементов           +
+с одинаковыми ключами.*/
+int F3_Input(Table* T,  Item* delitem)
+{
+    int key1, key2, n, flag1=0,j=0,k2;
+    char* info;
+
+    //Если таблица полная, то выходим
+    if (T->count == SIZE) {
+        printf("Table is full.\n");
+        return 0;
+    }
+
+    printf("\nMax size of table:%d", SIZE);
+     
+    do
+    {
+        printf("\nHow many elements do you want to add?\nEnter:");
+        getInt(&n);
+        if (n == 0)
+            return 0;
+        if (n > SIZE || n < 0)
+            printf("Error!\n");
+        else
+        if (n > (SIZE - T->count))
+        {
+            printf("You can only add %d characters.\n", (SIZE - T->count));
+            n = SIZE - T->count;
+        }
+    } while (n > SIZE || n < 0);
+
+    Item* I = (Item*)calloc(n,sizeof(Item));
+
+    for (int i=0; i < n; i++,I++)
+    {
+        I->info = (char*)calloc(1, sizeof(char));
+
+        //info
+        printf("Enter information:");
+        getStr(I);
+
+        //key1
+        do 
+        {
+            printf("Enter key1:");
+            getInt(&key1);    
+            flag1 = 0;
+            for (int y = 0; y < T->size; y++)
+                if (T->count>=1 && T->arr1[y].arr!=NULL)
+                    if (T->arr1[y].arr->key1 == key1)
+                    {
+                        flag1 = 1;
+                        printf("Key is busy.\n");
+                    }
+        } while (flag1 == 1);
+
+        //key2
+        do
+        {
+            printf("Enter key2:");
+            getInt(&key2);
+            flag1 = 0;
+            k2 = key2;
+            while (T->arr2[hash(&k2, SIZE)].arr != NULL)
+            {
+                if (T->arr2[hash(&k2, SIZE)].arr->key2 == key2)
+                {
+                    flag1 = 1;
+                    printf("The key is busy.\n");
+                }
+                k2++;
+            }
+        } while (flag1 == 1);
+
+        //Запись информации в таблицу
+        I->key1 = key1;
+        I->key2 = key2;
+
+        //Заполнение таблицы
+        T->count ++;
+             //Добавляем в первый массив
+        while (T->arr1[j].arr != NULL)
+            j++;
+        T->arr1[j].arr = I;
+        T->arr1[j].busy = 1;
+        j = 0;
+             //Добавляем во второй массив
+        while (T->arr2[hash(&key2, SIZE)].arr == delitem || T->arr2[hash(&key2, SIZE)].arr != NULL)
+            key2 = key2 ++;
+        T->arr2[hash(&key2, SIZE)].arr = I;
+        T->arr2[hash(&key2, SIZE)].busy = 1;
+    }
+    printf("Success. Added %d elements.\n", n);
+    return 0;
+}
+
+//- удаление из таблицы элемента, заданного каким - либо одним ключом                                    +
+int F4_DeleteRelease(Table* T, Item* delitem)
+{
+    int i = 0, res, key2, key;
+
+    if (T->count == 0) {
+        printf("\nTable is free.\n");
+        return 0;
+    }
+
+    //определяем, в какой таблице будем искать ключ
+    printf("\nOpen mas[1].\nMixed mas[2].\n");
+    do 
+    {
+        printf("Enter the number (1 or 2):");
+        getInt(&key);
+    } while (key > 2 || key < 1);
+
+    if (key == 1)
+    {
+        printf("\nEnter key: ");
+        getInt(&key);        
+
+
+        //проходимся по всем элементам в открытом массиве, пока не найдем нужный
+        while (T->arr1[i].arr->key1 != key)
+        {
+            i++;
+            if (T->arr1[i].arr==NULL)
+            {
+                printf("The key is not found.\n");
+                return 0;
+            }
+        }
+
+        key2 = T->arr2[i-1].arr->key2;
+        while (T->arr2[hash(&key2, SIZE)].arr->key2 != T->arr2[i-1].arr->key2)
+            key2++;
+
+        free(T->arr1[i].arr->info);
+        free(T->arr1[i].arr);
+
+        T->arr1[i].arr = delitem;
+        T->arr1[i].busy = -1;
+        T->arr2[hash(&key2, SIZE)].arr = delitem;
+        T->arr2[hash(&key2, SIZE)].busy = -1;
+    }
+    else
+    {
+        printf("Enter key: ");
+        getInt(&key);
+
+
+        //проходимся по всем элементам в перемешанном сложением массиве, пока не найдем нужный
+        key2 = key;
+        i = 0;
+        while (T->arr2[hash(&key2, SIZE)].arr->key2 != key)
+        {
+            if (T->arr2[hash(&key2, SIZE)+1].arr == NULL)
+            {
+                printf("The key is not found.\n");
+                return 0;
+            }
+            key2++;
+        }
+
+        key = T->arr2[hash(&key2, SIZE)].arr->key1;
+
+        i = 0;
+        while (T->arr1[i].arr->key1 != key)
+            i++;
+
+        free(T->arr1[i].arr->info);
+        free(T->arr1[i].arr);
+
+        T->arr1[i].arr = delitem;
+        T->arr1[i].busy = -1;
+        T->arr2[hash(&key2, SIZE)].arr = delitem;
+        T->arr2[hash(&key2, SIZE)].busy = -1;
+   
+    }
+    printf("The key was deleted.\n");
+    return 0;
+}
+
+/*-вывод содержимого таблицы на экран; при этом формат вывода должен соответсвовать приведенной выше     +
+структуре элемента таблицы.*/
+int F5_Print(Table* T, Item* delitem)
+{
+    TablePrint(T, delitem); //вывод
+    return 0;
+}
+
+/*- поиск в таблице элемента по любому заданному ключу; Результатом поиска должна быть копия найденного
+элемента со значениями всех ключей;*/
+int F6_FindKey(Table* T, int* a)
+{
+    int i = 0, key, j=0,k, key2;
+    if (T->count == 0)
+    {
+        puts("\nTable is free.");
+        return 0;
+    }
+
+    Item* CopyI = (Item*)malloc(sizeof(Item));
+    //CopyI->info = (char*)calloc(1, sizeof(char));
+
+    //определяем, в какой таблице будем искать ключ
+    printf("\nOpen mas[1].\nMixed mas[2].\n");
+    do
+    {
+        printf("Enter the number (1 or 2):");
+        getInt(&key);
+    } while (key > 2 || key < 1);
+
+    if (key == 1)
+    {
+        printf("\nEnter key: ");
+        getInt(&key);
+
+
+        //проходимся по всем элементам в открытом массиве, пока не найдем нужный
+        while (T->arr1[i].arr->key1 != key)
+        {
+            i++;
+            if (T->arr1[i].arr == NULL)
+            {
+                printf("The key is not found.\n");
+                return 0;
+            }
+        }
+        while (T->arr1[i].arr->info[j] != '\0')
+            j++;
+        CopyI->info = (char*)calloc(j+1, sizeof(char));
+
+        for(k=0;k<j;k++)
+            CopyI->info[k] = T->arr1[i].arr->info[k];
+        //CopyI->info[k + 1] = '\0';
+
+        CopyI->key1 = T->arr1[i].arr->key1;
+        CopyI->key2 = T->arr1[i].arr->key2;
+    }
+    else
+    {
+        printf("Enter key: ");
+        getInt(&key);
+
+
+        //проходимся по всем элементам в перемешанном сложением массиве, пока не найдем нужный
+        key2 = key;
+        i = 0;
+        while (T->arr2[hash(&key2, SIZE)].arr->key2 != key)
+        {
+            if (T->arr2[hash(&key2, SIZE) + 1].arr == NULL)
+            {
+                printf("The key is not found.\n");
+                return 0;
+            }
+            key2++;
+        }
+        while (T->arr2[hash(&key2, SIZE)].arr->info[j] != '\0')
+            j++;
+        CopyI->info = (char*)calloc(j + 1, sizeof(char));
+
+        for (k = 0; k < j; k++)
+            CopyI->info[k] = T->arr2[hash(&key2, SIZE)].arr->info[k];
+        //CopyI->info[k + 1] = '\0';
+
+        CopyI->key1 = T->arr2[hash(&key2, SIZE)].arr->key1;
+        CopyI->key2 = T->arr2[hash(&key2, SIZE)].arr->key2;
+    }
+    printf("Key1:%d\nKey2:%d\nInfo:%s\n", CopyI->key1, CopyI->key2, CopyI->info);
+    free(CopyI->info);
+    free(CopyI);
+    return 0;
+}
+
+//хеш функция                                                  +
+int hash(int* key, int size) 
+{
+    *key = *key % size;
+    return *key;
+};
+
+//выделение памяти под структуру и пустые массивы              +
+Table* TableCreate(int size)
+{
+    Table* T;
+    if (size <= 0)
+        return NULL;
+
+    //выделяем память под структуру таблицы
+    T = (Table*)malloc(sizeof(Table)); 
+    if (T == NULL)
+        return NULL;
+
+    //заполняем и выделяем память под массивы
+    T->count = 0;
+    T->size = size;
+    T->arr1 = (ARR*)calloc(size, sizeof(ARR)); //память под 1ый массив
+    T->arr2 = (ARR*)calloc(size, sizeof(ARR)); //память под 2ой массив
+    if (T->arr2 == NULL && T->arr1== NULL)
+        return NULL;
+
+    return T;
+}
+
+//удаление таблицы                                             +
+void TableDelete(Table* T, Item* delitem)
+{
+    int i = 0;
+    if (T->count == 0)
+    {
+        free(T->arr1);
+        free(T->arr2);
+        free(T);
+    }
+    else
+    {
+        while (i < SIZE)
+        {
+            if (T->arr1[i].arr->info != NULL)
+                free(T->arr1[i].arr->info);
+            free(T->arr1[i].arr);
+            i++;
+        }
+        free(T->arr1);
+        free(T->arr2);
+        free(T);
+    }
+    free(delitem);
+}
+
+//вывод таблицы                                                +
+void TablePrint(Table* T, Item* delitem)
+{
+    int i = 0, key;
+
+    if (T->count == 0)
+    {
+        puts("\nTable is free.");
+        return 0;
+    }
+
+    //определяем, в какой таблице будем искать ключ
+    printf("\nOpen mas[1].\nMixed mas[2].\n");
+    do
+    {
+        printf("Enter the number (1 or 2):");
+        getInt(&key);
+    } while (key > 2 || key < 1);
+
+    puts("\nTable:");
+    printf("count = %d, size = %d.\n", T->count, T->size);
+
+
+    //Вывод информации
+    if (key == 1)
+    {
+        printf("%2s %5s %5s %8s %3s\n", "i", "key1", "key2", "info", "busy");
+        for (i = 0; i < SIZE; i++)     //проходим по массиву
+        {
+            printf("%2d", i);         //выводим очередной элемент
+            if (T->arr1[i].arr != NULL)
+            {
+                printf("%5d %5d  %8s %3d\n", T->arr1[i].arr->key1, T->arr1[i].arr->key2, T->arr1[i].arr->info, T->arr1[i].busy);
+            }
+            else
+            {
+                printf("%5d %5d  %8s %3d\n", delitem->key1, delitem->key2, delitem->info, 0);
+            }
+        }
+    }
+    else
+    {
+        printf("%2s %5s %5s %8s %3s\n", "i", "key1", "key2", "info", "busy");
+        for (i = 0; i < SIZE; i++)     //проходим по массиву
+        {
+            printf("%2d", i);         //выводим очередной элемент
+            if (T->arr2[i].arr != NULL)
+            {
+                printf("%5d %5d  %8s %3d\n", T->arr2[i].arr->key1, T->arr2[i].arr->key2, T->arr2[i].arr->info, T->arr2[i].busy);
+            }
+            else
+            {
+                printf("%5d %5d  %8s %3d\n", delitem->key1, delitem->key2, delitem->info, 0);
+            }
+        }
+    }
+}
+
+//чтение целого числа                                          +
+int getInt(int* a)
+{
+    int n = 0, flag=0;
+    do
+    {
+        if (flag == 1)
+        {
+            printf("Error! Repeat.");
+            scanf_s("%*[^\n]");
+        }
+        n = scanf("%d", a);
+        flag = 1;
+        scanf("%*c");
+    } while (n <= 0);
+    return 0;
+}
+
+//получаем строку из входного потока                           +
+int getStr(Item* I)
+{
+    char buf[21];                                       //считываем из входного потока строку с помощью этого буфера, кусками по 20 сиволов
+    int n;                                              //сюда будет записываться результат scanf
+    int len = 0; 
+    //*s = (char*)calloc(1,sizeof(char*));              //указатель на результирующую строку
+    //**s = '\0';                                         //ноль байт, пока строка имеет только конец строки
+    *I->info = '\0';
+    do {
+        n = scanf_s("%20[^\n]", buf, 21);                     //считываем буфер
+        if (n < 0)
+        {                                               //если ввели конец файла (ctrl+Z), то будет -1
+            free(I->info);                                   //очищаем память, возвращаем пустой указатель
+            return -1;
+        }
+        if (n > 0) {                                    //если буфер не пустой
+            len += strlen(buf);                       //увеличиваем результирующую длину
+            I->info = (char*)realloc(I->info, len+1);           //добавляем память
+            if (I->info)                                     //если память выделилась
+                strcat(I->info, buf);                        //копируем строку из буфера в конец нашей строки
+            else
+            {                                          //если память не выделилась
+                free(I->info);                               //очищаем память
+                return -2;
+            }
+        }
+        else
+        {
+            scanf_s("%*[^\n]");
+            scanf("%*c");                               //если перенос строки, то очищаем входной поток
+        }
+    } while (n > 0);                                    //пока во входном потоке есть хоть один символ
+    return 0;
+}
