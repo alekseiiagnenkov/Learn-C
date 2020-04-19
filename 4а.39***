@@ -42,7 +42,7 @@ b)	и сама таблица, и информация, относящаяся �
 */
 
 #define _CRT_SECURE_NO_WARNINGS
-#define SIZE 10
+#define SIZE 20
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
@@ -74,7 +74,7 @@ typedef struct Table {
 }Table;
 
 //строки меню
-const char* msgs[] = { NULL, "Exit programm", "Generate random table", "Input item", "Delete releases", "Print table", "Find key"};
+const char* msgs[] = { NULL, "Exit programm", "Generate random table", "Input item", "Delete releases", "Print table", "Find key", "Free table"};
 
 //меню
 int F0_Menu();                         //меню
@@ -84,6 +84,7 @@ int F3_Input(Table*, Item*);           //ввод элемента
 int F4_DeleteRelease(Table*, Item*);   //удаление элемента
 int F5_Print(Table*, Item*);           //вывод элементов
 int F6_FindKey(Table*, Item*);         //поиск и копирование элемента
+int F7_FreeTable(Table*, Item*);       //очищение таблицы
 
 //функции работы с таблицей
 Table* TableCreate(int);               //функция создания пустой таблицы
@@ -97,11 +98,11 @@ int ItemPrint(Item*);                  //вывод элемента табли�
 int getInt(int*);                      //чтение целого числа
 int getStr(Item*);                     //функция ввода строк
  
-/*1. Программа должна содержать несколько функций; функция main должна выполнять:                        +      F4_DeleteRelease-ошибка в открытом массиве
+/*1. Программа должна содержать несколько функций; функция main должна выполнять:                        +     
 вывод меню, ввод и анализ ответа, вызов на исполнение требуемой функции;*/
 int main() {
     int  menu=0, ex=0, nomber=0;                                                    
-    int(*fun1[]) (Table*,Item*) = { NULL, F1_End, F2_Generate, F3_Input, F4_DeleteRelease, F5_Print, F6_FindKey};  //массив функций для 1 таблицы
+    int(*fun1[]) (Table*,Item*) = { NULL, F1_End, F2_Generate, F3_Input, F4_DeleteRelease, F5_Print, F6_FindKey, F7_FreeTable};  
 
     //Удаленный элемент
     Item* delitem = (Item*)calloc(1,sizeof(Item));
@@ -124,11 +125,11 @@ int main() {
     while (ex != 1)
     {
         menu = -1;                        
-        while (menu <= -1 || menu >= 7)
+        while (menu <= -1 || menu >= 8)
         {
             printf("Selected action (0 - Menu): ");
             getInt(&menu);	                      //чтение номера пункта меню
-            if (menu <= -1 || menu >= 7) {        //обнаружен неверный номер - ошибка
+            if (menu <= -1 || menu >= 8) {        //обнаружен неверный номер - ошибка
                 printf("Error!\n");
                 scanf_s("%*[^\n]");
             }
@@ -147,10 +148,10 @@ int main() {
 //вывод меню                                                                                             +
 int F0_Menu()
 {
-    printf("\n      MENU\nMax size of table:%d\n", SIZE);
+    printf("\n      MENU\n");
     int i;
-    for (i = 1; i < 7; ++i)
-        printf("%d %s\n", i, msgs[i]);
+    for (i = 1; i < 8; ++i)
+        printf("[%d] %s\n", i, msgs[i]);
     return 0;
 }
 
@@ -171,7 +172,7 @@ int F2_Generate(Table* T, Item* delitem)
         printf("Table is full.\n");
         return 0;
     }
-    printf("\nMax size of table:%d", SIZE);
+    printf("\nMax size of table:[%d]", SIZE);
 
     //Определяем сколько элементов хотим добавить
     do
@@ -185,8 +186,16 @@ int F2_Generate(Table* T, Item* delitem)
         else
             if (n > (SIZE - T->count))
             {
-                printf("You can only add %d characters.", (SIZE - T->count));
-                n = SIZE - T->count;
+                printf("You can only add [%d] characters. Do it?\nYes[1]    No[2]\n", (SIZE - T->count));
+                do
+                {
+                    printf("Enter:");
+                    getInt(&m);
+                } while (m <= 1 && m >= 2);
+                if (m == 1)
+                    n = SIZE - T->count;
+                else
+                    return 0;
             }
     } while (n > SIZE || n < 0);
 
@@ -252,7 +261,7 @@ int F2_Generate(Table* T, Item* delitem)
         T->arr2[hash(&key2, SIZE)].busy = 1;
 
     }
-    printf("Success. Added %d elements.\n", n);
+    printf("Success. Added [%d] elements.\n", n);
     T -> count = n;
     return 0;
 } 
@@ -261,7 +270,7 @@ int F2_Generate(Table* T, Item* delitem)
 с одинаковыми ключами.*/
 int F3_Input(Table* T,  Item* delitem)
 {
-    int key1, key2, n, flag1=0,j=0,k2;
+    int key1, key2, n, flag1=0,j=0,k2, m;
     char* info;
 
     //Если таблица полная, то выходим
@@ -270,7 +279,7 @@ int F3_Input(Table* T,  Item* delitem)
         return 0;
     }
 
-    printf("\nMax size of table:%d", SIZE);
+    printf("\nMax size of table:[%d]", SIZE);
      
     do
     {
@@ -283,8 +292,16 @@ int F3_Input(Table* T,  Item* delitem)
         else
         if (n > (SIZE - T->count))
         {
-            printf("You can only add %d characters.\n", (SIZE - T->count));
-            n = SIZE - T->count;
+            printf("You can only add [%d] characters. Do it?\nYes[1]    No[2]\n", (SIZE - T->count));
+            do
+            {
+                printf("Enter:");
+                getInt(&m);
+            } while (m <= 1 && m >= 2);
+            if (m == 1)
+                n = SIZE - T->count;
+            else
+                return 0;
         }
     } while (n > SIZE || n < 0);
 
@@ -348,7 +365,7 @@ int F3_Input(Table* T,  Item* delitem)
         T->arr2[hash(&key2, SIZE)].arr = I;
         T->arr2[hash(&key2, SIZE)].busy = 1;
     }
-    printf("Success. Added %d elements.\n", n);
+    printf("Success. Added [%d] elements.\n", n);
     return 0;
 }
 
@@ -373,21 +390,10 @@ int F4_DeleteRelease(Table* T, Item* delitem)
     if (key == 1)
     {
 
-        printf("\nEnter key: ");
+        printf("\nEnter key:");
         getInt(&key);        
 
-
-        //проходимся по всем элементам в открытом массиве, пока не найдем нужный
-        //while (T->arr1[i].arr->key1 != key)
-        //{
-        //    i++;
-        //    if (T->arr1[i].arr==NULL)
-        //    {
-        //        printf("The key is not found.\n");
-        //        return 0;
-        //    }
-        //}
-
+        //Ищем нужный ключ
         for (i=0;i<SIZE;i++)
         if (T->arr1[i].arr != NULL)
         {
@@ -417,7 +423,7 @@ int F4_DeleteRelease(Table* T, Item* delitem)
     }
     else
     {
-        printf("Enter key: ");
+        printf("Enter key:");
         getInt(&key);
 
 
@@ -449,7 +455,7 @@ int F4_DeleteRelease(Table* T, Item* delitem)
         T->arr2[hash(&key2, SIZE)].busy = -1;
    
     }
-    printf("The key was deleted.\n");
+    printf("The Item was deleted.\n");
     return 0;
 }
 
@@ -485,7 +491,7 @@ int F6_FindKey(Table* T, int* a)
 
     if (key == 1)
     {
-        printf("\nEnter key: ");
+        printf("\nEnter key:");
         getInt(&key);
 
 
@@ -512,7 +518,7 @@ int F6_FindKey(Table* T, int* a)
     }
     else
     {
-        printf("Enter key: ");
+        printf("Enter key:");
         getInt(&key);
 
 
@@ -542,6 +548,26 @@ int F6_FindKey(Table* T, int* a)
     printf("Key1:%d\nKey2:%d\nInfo:%s\n", CopyI->key1, CopyI->key2, CopyI->info);
     free(CopyI->info);
     free(CopyI);
+    return 0;
+}
+
+//Очистка таблицы
+int F7_FreeTable(Table* T, Item* delitem)
+{
+    int i = 0, j=0;
+        while (i < SIZE)
+        {
+            if (T->arr1[i].arr != NULL)
+            {
+                j++;
+                if (T->arr1[i].arr->info != NULL)
+                    free(T->arr1[i].arr->info);
+                free(T->arr1[i].arr);
+            }
+            i++;
+        }
+        printf("The table was cleared. Cleared [%d] elements.\n", j);
+        T->count = 0;
     return 0;
 }
 
@@ -589,9 +615,12 @@ void TableDelete(Table* T, Item* delitem)
     {
         while (i < SIZE)
         {
-            if (T->arr1[i].arr->info != NULL)
-                free(T->arr1[i].arr->info);
-            free(T->arr1[i].arr);
+            if (T->arr1[i].arr != NULL)
+            {
+                if (T->arr1[i].arr->info != NULL)
+                    free(T->arr1[i].arr->info);
+                free(T->arr1[i].arr);
+            }
             i++;
         }
         free(T->arr1);
@@ -667,7 +696,7 @@ int getInt(int* a)
     {
         if (flag == 1)
         {
-            printf("Error! Repeat.");
+            printf("Error!");
             scanf_s("%*[^\n]");
         }
         n = scanf("%d", a);
