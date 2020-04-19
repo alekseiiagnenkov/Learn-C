@@ -67,24 +67,24 @@ typedef struct Table {
 //строки меню
 const char* msgs[] = { NULL, "Exit programm", "Generate random table", "Input item", "Delete releases", "Print table", "Find key", "Free table"};
 //меню
-int F0_Menu();                         //меню
+void F0_Menu();                         //меню
 int F1_End(Table*, Item*);             //функция выхода
 int F2_Generate(Table*, Item*);        //генерация рандомных значений в таблице
 int F3_Input(Table*, Item*);           //ввод элемента
 int F4_DeleteRelease(Table*, Item*);   //удаление элемента
-int F5_Print(Table*, Item*);           //вывод элементов
+void F5_Print(Table*, Item*);           //вывод элементов
 int F6_FindKey(Table*, Item*);         //поиск и копирование элемента
 int F7_FreeTable(Table*, Item*);       //очищение таблицы
 //функции работы с таблицей
 Table* TableCreate(int);               //функция создания пустой таблицы
 void TableDelete(Table*,Item*);        //удаление таблицы
-void TablePrint(Table*, Item*);        //вывод таблицы
+int TablePrint(Table*, Item*);        //вывод таблицы
 int hash(int*, int);                   //определение ключа 2
 void DelItem(Item*);                   //удаление элемента
 int ItemPrint(Item*);                  //вывод элемента таблицы
 
 //Функции ввода
-int getInt(int*);                      //чтение целого числа
+void getInt(int*);                      //чтение целого числа
 int getStr(Item*);                     //функция ввода строк
 /*1. Программа должна содержать несколько функций; функция main должна выполнять:                        +     
 вывод меню, ввод и анализ ответа, вызов на исполнение требуемой функции;*/
@@ -112,13 +112,12 @@ int main() {
     return 0;
 }
 //вывод меню                                                                                             +
-int F0_Menu()
+void F0_Menu()
 {
     printf("\n      MENU\n");
     int i;
     for (i = 1; i < 8; ++i)
         printf("[%d] %s\n", i, msgs[i]);
-    return 0;
 }
 //завершение программы                                                                                   +
 int F1_End(Table* T, Item* delitem)
@@ -336,17 +335,19 @@ int F4_DeleteRelease(Table* T, Item* delitem)
         getInt(&key);
         //проходимся по всем элементам в перемешанном сложением массиве, пока не найдем нужный
         key2 = key;
-        for (i=0; i <= SIZE; i++) {
+        i = 0;
+        for (i; i < SIZE; i++) {
             if (T->arr2[hash(&key2, SIZE)].arr != NULL) {
-                if (T->arr2[hash(&key2, SIZE)].arr->key2 != key)
-                    key2++;
+                if (T->arr2[hash(&key2, SIZE)].arr->key2 != key || T->arr2[hash(&key2, SIZE)].busy == 1) {
+                    i = SIZE + 1;
+                }
                 else
-                    flag = 1;
+                    key2++;
             }
-        }
-        if (flag==0){
-            printf("The key is not found.\n");
-            return 0;
+            else {
+                printf("The key is not found.\n");
+                return 0;
+            }
         }
         key = T->arr2[hash(&key2, SIZE)].arr->key1;
         i = 0;
@@ -365,10 +366,9 @@ int F4_DeleteRelease(Table* T, Item* delitem)
 }
 /*-вывод содержимого таблицы на экран; при этом формат вывода должен соответсвовать приведенной выше     +
 структуре элемента таблицы.*/
-int F5_Print(Table* T, Item* delitem)
+void F5_Print(Table* T, Item* delitem)
 {
     TablePrint(T, delitem); //вывод
-    return 0;
 }
 /*- поиск в таблице элемента по любому заданному ключу; Результатом поиска должна быть копия найденного  +
 элемента со значениями всех ключей;*/
@@ -496,7 +496,7 @@ void TableDelete(Table* T, Item* delitem)
     free(delitem);
 }
 //вывод таблицы                                                +
-void TablePrint(Table* T, Item* delitem)
+int TablePrint(Table* T, Item* delitem)
 {
     int i = 0, key;
     if (T->count == 0){
@@ -536,9 +536,10 @@ void TablePrint(Table* T, Item* delitem)
             }
         }
     }
+    return 0;
 }
 //чтение целого числа                                          +
-int getInt(int* a)
+void getInt(int* a)
 {
     int n = 0, flag=0;
     do
@@ -551,7 +552,6 @@ int getInt(int* a)
         flag = 1;
         scanf("%*c");
     } while (n <= 0);
-    return 0;
 }
 //получаем строку из входного потока                           +
 int getStr(Item* I){
@@ -578,3 +578,4 @@ int getStr(Item* I){
         }                               //если перенос строки, то очищаем входной поток
     } while (n > 0);                                    //пока во входном потоке есть хоть один символ
     return 0;
+}
