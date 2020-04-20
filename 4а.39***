@@ -67,24 +67,25 @@ typedef struct Table {
 //строки меню
 const char* msgs[] = { NULL, "Exit programm", "Generate random table", "Input item", "Delete releases", "Print table", "Find key", "Free table"};
 //меню
-void F0_Menu();                         //меню
+void F0_Menu();                        //меню
 int F1_End(Table*, Item*);             //функция выхода
 int F2_Generate(Table*, Item*);        //генерация рандомных значений в таблице
 int F3_Input(Table*, Item*);           //ввод элемента
 int F4_DeleteRelease(Table*, Item*);   //удаление элемента
-void F5_Print(Table*, Item*);           //вывод элементов
+void F5_Print(Table*, Item*);          //вывод элементов
 int F6_FindKey(Table*, Item*);         //поиск и копирование элемента
 int F7_FreeTable(Table*, Item*);       //очищение таблицы
 //функции работы с таблицей
 Table* TableCreate(int);               //функция создания пустой таблицы
 void TableDelete(Table*,Item*);        //удаление таблицы
-int TablePrint(Table*, Item*);        //вывод таблицы
+int TablePrint(Table*, Item*);         //вывод таблицы
 int hash(int*, int);                   //определение ключа 2
 void DelItem(Item*);                   //удаление элемента
 int ItemPrint(Item*);                  //вывод элемента таблицы
-
+int CheckTable(Table*);                 //переполнение таблицы
+int CheckTableFree(Table*);                 //пустая таблицы
 //Функции ввода
-void getInt(int*);                      //чтение целого числа
+void getInt(int*);                     //чтение целого числа
 int getStr(Item*);                     //функция ввода строк
 /*1. Программа должна содержать несколько функций; функция main должна выполнять:                        +     
 вывод меню, ввод и анализ ответа, вызов на исполнение требуемой функции;*/
@@ -130,12 +131,8 @@ int F1_End(Table* T, Item* delitem)
 int F2_Generate(Table* T, Item* delitem)
 {
     int key1, key2, n, flag1 = 0, j = 0, t, k2;
-    int m;
-    //Если таблица полная, то выходим
-    if (T->count == SIZE) {
-        printf("Table is full.\n");
-        return 0;
-    }
+    int m;   
+    CheckTable(T);
     printf("\nMax size of table:[%d]", SIZE);
     //Определяем сколько элементов хотим добавить
     do{
@@ -214,11 +211,7 @@ int F3_Input(Table* T,  Item* delitem)
 {
     int key1, key2, n, flag1=0,j=0,k2, m;
     char* info;
-    //Если таблица полная, то выходим
-    if (T->count == SIZE) {
-        printf("Table is full.\n");
-        return 0;
-    }
+    CheckTable(T);
     printf("\nMax size of table:[%d]", SIZE);
     do{
         printf("\nHow many elements do you want to add?\nEnter:");
@@ -295,10 +288,7 @@ int F3_Input(Table* T,  Item* delitem)
 int F4_DeleteRelease(Table* T, Item* delitem)
 {
     int i = 0, res, key2, key, flag=0;
-    if (T->count == 0) {
-        printf("\nTable is free.\n");
-        return 0;
-    }
+    CheckTable(T);
     //определяем, в какой таблице будем искать ключ
     printf("\nOpen mas[1].\nMixed mas[2].\n");
     do{
@@ -375,10 +365,7 @@ void F5_Print(Table* T, Item* delitem)
 int F6_FindKey(Table* T, int* a)
 {
     int i = 0, key, j=0,k, key2;
-    if (T->count == 0){
-        puts("\nTable is free.");
-        return 0;
-    }
+    CheckTableFree(T);
     Item* CopyI = (Item*)malloc(sizeof(Item));
     //определяем, в какой таблице будем искать ключ
     printf("\nOpen mas[1].\nMixed mas[2].\n");
@@ -442,10 +429,7 @@ int F6_FindKey(Table* T, int* a)
 int F7_FreeTable(Table* T, Item* delitem)
 {
     int i = 0, j = 0;
-    if (T->count == 0){
-        puts("\nTable is free.");
-        return 0;
-    }
+    CheckTableFree(T);
         while (T->arr1[i].arr != NULL){
             if (T->arr1[i].arr->info != NULL && T->arr1[i].busy!=-1)
                 free(T->arr1[i].arr->info);
@@ -537,6 +521,21 @@ int TablePrint(Table* T, Item* delitem)
         }
     }
     return 0;
+}
+//переполнение таблицы
+int CheckTable(Table* T)
+{
+    if (T->count == SIZE) {
+        printf("Table is full.\n");
+        return 0;
+    }
+}
+int CheckTableFree(Table* T)
+{
+    if (T->count == 0) {
+        puts("\nTable is free.");
+        return 0;
+    }
 }
 //чтение целого числа                                          +
 void getInt(int* a)
