@@ -1,25 +1,19 @@
 /*Из входного потока вводится произвольное число строк. Длина каждой строки произваольна.
 Конец ввода определяется концом ввода файла.
-
 Сжать каждую строку, удалив из нее все символы, совпадающие с первым отличным от пробела
 символом исходной строки, а так же лишние пробелы и символы тамбуляции. В новой строке все
 слова должны быть распределены только одним пробелом. Полученную строку вывести на экран.
-
 Примечания:
 1. Каждая строка представлена списком; первое поле элемента списка- символ строки;
 второе- указатель на следующий элемент списка или NULL в конце списка; список результата
 формировать, модифицируя исходный список.
-
 2. Ввод строк должен быть организован с помощью функции scanf() со спецификациями для ввода
 строк. Функцию getchar() или спецификацию %c в scanf() не использовать!
-
 3. Логически законченные части алгоритма решения задачи должны быть оформлены отдельными
 функциями с параметрами (например, пропуск разделителей, создание списка, вывод списка и др ).
-
 4. Целесообразно обработку строк оформить соответствующей функцией, тогда в функции main
 должны быть ввод строки, вызов функции обработки, вывод результата - в цикле, пока не
 закончится ввод; конец цикла - по достижении конца файла.
-
 5. Все функции должны работать со списком; при вводе строки следует сразу создавать список.*/
 
 #include <stdio.h>
@@ -33,19 +27,20 @@ int getList(Item**);
 void putList(char*, Item*);
 Item* reorg(Item*);
 Item* deleteList(Item*);
-Item* skip(Item*,int*);
+Item* skip(Item*, int*);
 char* skip_str(char*);
-Item* DeletS(Item*,char*,int*);
+Item* DeletS(Item*, char*, int*);
 
 //Главная функция
 int main()
 {
 	Item* st;
-
 	while (puts("Enter string:"), getList(&st)) {
-		putList("Put string:", st);
-		if (st == NULL)
+		if (st == NULL){
+			printf("Erorr! Repeat.\n");
 			continue;
+		}
+		putList("Put string:", st);
 		st = reorg(st);
 		putList("Out string:", st);
 		st = deleteList(st);
@@ -59,9 +54,7 @@ Item* reorg(Item* ptr)
 	Item* head = NULL;
 	Item* tmp = NULL;
 	char symbol = ' '; // Первый символ
-	//head = ptr;
-	int flag=1, flagS=1, flagT=0, flagHead=0;
-
+	int flag = 1, flagS = 1, flagT = 0, flagHead = 0;
 	while (ptr != NULL) {
 		if (ptr->next != NULL) {
 			flag = 0;
@@ -86,8 +79,6 @@ Item* reorg(Item* ptr)
 			ptr = head;
 			return head;
 		}
-
-
 	}
 	printf("[%c] was deleted.\n", symbol);
 	ptr = head;
@@ -96,9 +87,8 @@ Item* reorg(Item* ptr)
 
 Item* DeletS(Item* ptr, char symbol, int* flagS)
 {
-	Item* tmp = NULL, *tmp1 = NULL, *tmp2=NULL;
+	Item* tmp = NULL, * tmp1 = NULL, * tmp2 = NULL;
 	int a;
-
 	while (ptr->next->c == symbol) {
 		if (ptr->next->next != NULL) {
 			tmp = ptr->next;
@@ -118,7 +108,6 @@ Item* DeletS(Item* ptr, char symbol, int* flagS)
 					free(tmp2);
 				}
 			}
-
 			free(tmp);
 			*flagS = 1;
 			if (ptr->next == NULL) {
@@ -131,7 +120,7 @@ Item* DeletS(Item* ptr, char symbol, int* flagS)
 		else {
 			tmp = ptr->next->next;
 			ptr->next = NULL;
-			free (tmp);
+			free(tmp);
 			return ptr;
 		}
 	}
@@ -142,7 +131,6 @@ Item* DeletS(Item* ptr, char symbol, int* flagS)
 Item* skip(Item* ptr, int* flag)
 {
 	Item* tmp = NULL;
-
 	if (ptr->next == NULL)
 		return ptr;
 	if (ptr->next->next == NULL)
@@ -165,7 +153,7 @@ void putList(char* msg, Item* ptr)
 {
 	printf("%s", msg);
 	for (; ptr != NULL; ptr = ptr->next)
-			printf("%c", ptr->c);
+		printf("%c", ptr->c);
 	printf("\n");
 }
 
@@ -173,7 +161,6 @@ void putList(char* msg, Item* ptr)
 Item* deleteList(Item* ptr)
 {
 	Item* tmp = NULL;
-
 	while (ptr != NULL) {
 		tmp = ptr;
 		ptr = ptr->next;
@@ -197,7 +184,6 @@ int getList(Item** pptr)
 	Item head = { '*', NULL };
 	Item* last = &head;
 	int n, rc = 1;
-
 	do {
 		n = scanf_s("%80[^\n]", buf, 81);
 		if (n == 0) {
