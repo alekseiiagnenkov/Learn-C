@@ -195,7 +195,7 @@ int F2_Generate(Table* T, Item* delitem)
 int F3_Input(Table* T, Item* delitem)
 {
     printf("\n      [INPUT ITEM]");
-    int key1, key2, n, j = 0, k2;
+    int key1, key2, n, j = 0, k2, flag=0;
     char* info;
     if (CheckTable(T) == 1)
         return 0;
@@ -206,10 +206,17 @@ int F3_Input(Table* T, Item* delitem)
         printf("Enter information:");
         info = getstr();
         do {
+            if (flag)
+                printf("Error! Duplicate keys!\n");
+            flag = 1;
             printf("Enter key1:");
             getInt(&key1);
         } while (FindKey1(T, &key1, 2) != -1);
+        flag = 0;
         do {
+            if (flag)
+                printf("Error! Duplicate keys!\n");
+            flag = 1;
             printf("Enter key2:");
             getInt(&key2);
             k2 = key2;
@@ -326,7 +333,6 @@ int F6_FindKey(Table* T, Item* delitem)
 //Очистка таблицы                                                                                        +                                           
 int F7_FreeTable(Table* T, Item* delitem)
 {
-    printf("\n      [FREE ITEMS]\n");
     int i = 0;
     if (CheckTableFree(T) == 1)
         return 0;
@@ -414,7 +420,7 @@ int D_Load(Table* T,Item* delitem)
         return 0;
     //если такого файла нет, то создаем таблицу
     if (load(T, fname, delitem) == 0) {
-        printf("File isn't find.");
+        printf("File wasn't found.");
         create(T, fname, SIZE);
     }
     free(fname);
@@ -439,6 +445,7 @@ int load(Table* T, char* fname, Item*delitem)
         T->arr2[key2].arr = T->arr1[i];
         T->arr2[key2].busy = 1;
     }
+    printf("File was found.");
     return 1;
 }
 //создаем новую таблицу                                +
@@ -520,7 +527,7 @@ int choose(Table* T) {
     int n, m;
     printf("\nMax size of table:[%d]", SIZE);
     do {
-        printf("\nHow many elements do you want to add?\nEnter:");
+        printf("\nYou can add [%d] Items. How many Items do you want to add?\nEnter:", (T->size)-(T->count));
         getInt(&n);
         if (n == 0)
             return 0;
