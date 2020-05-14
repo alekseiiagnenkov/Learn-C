@@ -24,7 +24,7 @@
 1. Программа должна содержать несколько функций; функция main() должна выполнять: вывод меню,           +
 ввод и анализ ответа, вызов на исполнение требуемой функции;                                            
 2. В программе нужно предусмотреть проверку правильности ввода данных.                                  +
-3. Оценить сложность реализованных алгоритмов.                                                          -
+3. Оценить сложность реализованных алгоритмов.                                                          +
 4. Для целей отладки реализовать форматированный вывод таблицы в виде дерева.                           +
 5. Для целей отладки реализовать загрузку таблицы из файла в формате:                                   +
 •	Ключ 1
@@ -93,16 +93,20 @@ void ShiftNode(Node*, int, int);       //сдвиг элементов в узл
 int SearchPTR(Node*, int);             //поиск нужного поддерева или положения Item
 int AddItemNode(Node*, Item*);         //добавление элемета в узел 
 void PrintTree(Node*, int);            //вывод дерева 
-void ProcessingNode(Node*);            //обработка узла(схлопывание)
-Item* FindKeyTree(Node**, int);        //поиск ключа в дереве
+Node* ProcessingNode(Node*, Node**);            //обработка узла(схлопывание)
+Item* FindKeyTree(Node**, int, int);        //поиск ключа в дереве
 void DeletTree(Node*);                 //удаление дерева
 int CheckTreeFree(Node*);
+Node* DeleteKeyTree(Node*, int);
+void Redistribution(Node*, int, int);
+Node* fixNode(Node*, int);
 //[ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ]
-int hash(int*, int);                   //определение ключа 2
+int hash(int, Table*);                   //определение ключа 2
 int CheckTableFull(Table*);            //переполнение таблицы
 int CheckTableFree(Table*);            //пустая таблицы
 int choose(Table*);                    //выбор для добавления элементов
-int FindKeyTable(Table*, int, int, Node*);  //проверка ключа
+int FindKeyTable(Table*, int, int);  //проверка ключа
+void DelItem(Item*);
 //[ФУНКЦИИ ВВОДА]
 int getInt(int*);                      //чтение целого числа
 char* getstr();                        //функция ввода строк
@@ -233,21 +237,37 @@ int F3_Input(Table* T, Node** root)
         printf("Success. Added [%d] elements.\n", n);
     return 0;
 }
-//- удаление из таблицы элемента, заданного своим ключом, без нарушения свойств упорядоченности таблицы  -                                 
+//- удаление из таблицы элемента, заданного своим ключом, без нарушения свойств упорядоченности таблицы  +                                 
 int F4_DeleteRelease(Table* T, Node** root)
 {
     printf("\n      [DELETED REALEASE]");
     int i, key;
+    Node* N = *root;
     if (CheckTableFree(T) == 1)
         return 0;
     printf("\nEnter key:");
     getInt(&key);
-    if (FindKey(T, key, 1, root)) {
-        printf("The key is not found.\n");
+    if (FindKeyTable(T, key, 1))
+        printf("The key is not found in the kash-table.\n");
+    else {
+        free(T->arr[hash(key, T)]);
+        T->arr[hash(key, T)] = NULL;
+        T->count--;
         return 0;
     }
-    T->arr[hash(key, T)] = NULL;
-    T->count--;
+    N = FindKeyTree(root, key, 1);
+    if (N == NULL) {
+        printf("The key is not found in tree.\n");
+        return 0;
+    }
+    else
+        N = DeleteKeyTree(&N, key);
+    if (N->n != 0) {
+        if (N->parent == NULL)
+            *root = N;
+    }
+    else
+        *root = NULL;
     printf("The Item was deleted.\n");
     return 0;
 }
@@ -365,7 +385,7 @@ int F9_Timing()
     }
     DeletTree(root);
     TableDelete(T);
-    return 1;
+    return 0;
 }
 //                                      [ФУНКЦИИ РАБОТЫ С ДЕРЕВОМ]
 //Добавление элемента в дерево                      +    
@@ -437,14 +457,27 @@ void ShiftNode(Node* N, int a, int b)
     int i;
     if (a == 1)
         for (i = 0; N->arr[b] != NULL; i++) {
+            if (N->arr[i + 1] == NULL)
+                continue;
             N->arr[i] = N->arr[i + 1];
-            N->ptr[i] = N->ptr[i + 1];
-            N->ptr[i + 1] = N->ptr[i + 2];
             N->arr[i + 1] = NULL;
-            N->ptr[i + 1] = NULL;
+            if (N->ptr[i] == NULL) {
+                N->ptr[i] = N->ptr[i + 1];
+                N->ptr[i + 1] = NULL;
+            }
+            if (N->ptr[i + 1] == NULL) {
+                N->ptr[i + 1] = N->ptr[i + 2];
+                N->ptr[i + 2] = NULL;
+            }
+            if (N->ptr[i] == NULL && N->ptr[i + 1] != NULL) {
+                N->ptr[i] = N->ptr[i + 1];
+                N->ptr[i + 1] = NULL;
+            }
         }
     else
         for (i = 2; N->arr[b] != NULL; i--) {
+            if (N->arr[i - 1] == NULL)
+                continue;
             N->arr[i] = N->arr[i-1];
             if (N->ptr[i + 1]==NULL)
             N->ptr[i+1] = N->ptr[i];
@@ -477,25 +510,34 @@ int AddItemNode(Node* N, Item* I)
     N->n++;
     return 0;
 }
-//обработка узла(схлопывание)                       ? (Нужно в удалении)
-void ProcessingNode(Node* N)
+//обработка узла(схлопывание)                       + 
+Node* ProcessingNode(Node* N, Node** root)
 {
-    if (N->n == 1 && N->ptr[0] != NULL)
-        if (N->ptr[0]->n == 1 && N->ptr[1]->n == 1) {                                 //если да, то схлопываем узлы
-            if (N->ptr[0]->arr[SearchPTR(N->ptr[0], N->arr[0]->key)] != NULL)         //Если элемент нужно вставить на место другого
-                ShiftNode(N->ptr[0], 2, SearchPTR(N->ptr[0], N->arr[0]->key));
-            N->ptr[0]->arr[SearchPTR(N->ptr[0], N->arr[0]->key)] = N->arr[0];
-            N->parent->ptr[SearchPTR(N->parent, N->arr[0]->key)]=N->ptr[0];           //перенаправление указателя родителя
-            N->ptr[0]->parent = N->parent;
-            if (N->ptr[0]->arr[SearchPTR(N->ptr[0], N->ptr[1]->arr[0]->key)] != NULL) //Если элемент нужно вставить на место другого
-                ShiftNode(N->ptr[0], 2, SearchPTR(N->ptr[0], N->ptr[1]->arr[0]->key));
-            N->ptr[0]->arr[SearchPTR(N->ptr[0], N->ptr[1]->arr[0]->key)] = N->ptr[1]->arr[0];
-            N->ptr[0]->ptr[2] = N->ptr[1]->ptr[0];
-            N->ptr[0]->ptr[3] = N->ptr[1]->ptr[1];
-            N->ptr[0]->n = 3;
-            free(N->ptr[1]);
-            free(N);
+    Node* n = N->ptr[0];
+    N->ptr[0]->arr[1] = N->arr[0];
+    N->ptr[0]->arr[2] = N->ptr[1]->arr[0];
+    N->ptr[0]->ptr[2] = N->ptr[1]->ptr[0];
+    N->ptr[0]->ptr[3] = N->ptr[1]->ptr[1];
+    N->ptr[0]->n = 3;
+    free(N->ptr[1]);
+    N->ptr[1] = NULL;
+    if (N->parent == NULL) {
+        *root = N;
+        free(N);
+        N->parent = NULL;
+        return N;
+    }
+    else
+        if (N->parent!=NULL) {
+            fixNode(N->parent, SearchPTR(N->parent, N->arr[0]->key));
+
         }
+        //else {
+        //    N->ptr[0]->parent = N->parent;
+        //    N->parent->ptr[SearchPTR(N->parent, N->arr[0]->key)] = N->ptr[0];
+        //    free(N);
+        //}
+    return N->parent;
 }
 //вывод дерева                                      +
 void PrintTree(Node* N, int level)
@@ -513,16 +555,19 @@ void PrintTree(Node* N, int level)
     }
 }
 //поиск ключа в дереве                              +
-Item* FindKeyTree(Node** root, int key)
+Item* FindKeyTree(Node** root, int key, int a)
 {
     Node* N = *root;
     if (CheckTreeFree(*root))
         return 0;
-    while (1) {            
+    while (1) {
         int i = SearchPTR(N, key);
         if (N->arr[i] != NULL) {   //если имеет дочерние узлы
             if (N->arr[i]->key == key)
-                return N->arr[i];
+                if (a == 1)
+                    return N;
+                else
+                    return N->arr[i];
             else
                 if (N->ptr[i] == NULL)
                     return NULL;
@@ -530,9 +575,8 @@ Item* FindKeyTree(Node** root, int key)
         if (N->ptr[0] != NULL)
             N = N->ptr[i];         //переход на следующий узел
         else
-            return 0;
+            return NULL;
     }
-
 }
 //удаление дерева                                   +
 void DeletTree(Node* N)
@@ -549,7 +593,122 @@ void DeletTree(Node* N)
         }
     }
 }
-//                                      [ФУНКЦИИ РАБОТЫ С ТАБЛИЦЕЙ] 
+//удаление элемента из дерева                       ?(12 элементов-нормально)
+Node* DeleteKeyTree(Node** root, int key)
+{
+    Node* n = *root; //нужен для преобразований и поиска
+    Node* N = *root; //указывает на узел с удаляемым элементом
+    int i = SearchPTR(n, key), j = 0, k = 1, flag=1;
+    if (n->ptr[0] == NULL) {          //если не имеет поддеревьев
+        DelItem(n->arr[i]);
+        n->arr[i] = NULL;
+    }
+    else {                            //если имеет поддеревья, то ищем замену Item
+        n = n->ptr[i+1];
+        while (n->ptr[0] != NULL)     //пока не найдем минимальный ключ в правом поддереве
+            n = n->ptr[0];
+        if (n->n == 1) {
+            n = *root;
+            k = i;
+            while (n->ptr[i] != NULL) //пока не найдем минимальный ключ в левом поддереве
+            {
+                n = n->ptr[k];
+                k = 0;
+                while (n->arr[k]) {    //находим максимальный ключ последнем узле левого поддерева
+                    k++;
+                }
+            }
+            if (n->n == 1) {
+                key = n->arr[k - 1]->key;
+            }
+        }
+        DelItem(N->arr[i]);
+        N->arr[i] = n->arr[k - 1];
+        n->arr[k - 1] = NULL;
+    }
+    n->n--;
+    ShiftNode(n, 1, (n->n));
+    if (n->n == 0)
+        if (n->parent != NULL) {
+            i = SearchPTR(n->parent, key);
+            for (int g = i - 1, k = 0; k < 2; g = g + 2, k++)    //ситуация перераспределения если хотя бы у одного из братьев есть 2 Item
+                if (g >= 0)
+                    if (n->parent->ptr[g] != NULL)
+                        if (n->parent->ptr[g]->n >= 2) {
+                            N = fixNode(n->parent, i);    //перераспределение Item
+                            flag = 0;
+                            break;
+                        }
+            if (flag)
+                N = fixNode(n->parent, i);
+        }
+        else
+            ShiftNode(n, 1, (n->n));
+    n = N;
+    if (n->parent != NULL)
+        n = n->parent;
+    if (n->ptr[0] != NULL && n->ptr[1] != NULL)
+        if (n->n == 1 && n->ptr[0]->n == 1 && n->ptr[1]->n == 1)
+            n = ProcessingNode(n, &root);
+    return n;
+}
+/*изменение дерева (i=0-поворот ключей вправо,      ?
+для остальных случаев влево)*/ 
+Node* fixNode(Node* n, int i) 
+{
+    int j;
+    Node* g;
+    if (n->ptr[i]->n == 0 && i<3) {
+        free(n->ptr[i]);
+        n->ptr[i] = NULL;
+    }
+    j = SearchPTR(n->ptr[i - 1], n->arr[i - 1]->key);
+    if (i != 0) {
+        if (n->ptr[i - 1]->n == 3) {
+            n->ptr[i]->arr[0]= n->arr[i - 1];
+            g = n->ptr[i];
+            n->ptr[i]->n = 1;
+            n->arr[i - 1] = NULL;
+            n->n--;
+            SplitNodeUp(n->ptr[i - 1], n, n->ptr[i]->arr[0]);
+            n->ptr[3]->arr[1] = g->arr[0];
+        }
+        else {
+            n->ptr[i - 1]->arr[j] = n->arr[i - 1];
+            n->arr[i - 1] = NULL;
+            n->ptr[i - 1]->n++;
+        }
+    }
+    else {
+        ShiftNode(n->ptr[i + 1], 2, 0);
+        n->ptr[i + 1]->arr[0] = n->arr[i];
+        n->ptr[i + 1]->ptr[0] = n->ptr[i];
+        n->arr[i] = NULL;
+        n->ptr[i + 1]->n++;
+    }
+    n->n--;
+    ShiftNode(n, 1, n->n);
+
+    if (n->arr[0] == NULL) {
+        if (n->parent != NULL)
+            n->ptr[0]->parent = n->parent;
+        n = n->ptr[0];
+        if (n->parent->n == 0) {
+            free(n->parent);
+            n->parent = NULL;
+        }
+        if (n->parent != NULL)
+            fixNode(n->parent, 0); 
+    }
+    return n;
+}
+//удаление элемента                                 +
+void DelItem(Item* I)  
+{
+    free(I->info);
+    free(I);
+}
+//                                      [ФУНКЦИИ РАБОТЫ С ТАБЛИЦЕЙ]
 int FindKey(Table* T, Node** root, int key, int a)
 {
     Item* I;
@@ -562,7 +721,7 @@ int FindKey(Table* T, Node** root, int key, int a)
             return 0;
         }
         printf("Tree:\n");
-        I = FindKeyTree(root, key);
+        I = FindKeyTree(root, key, 0);
         if (I == NULL)
             printf("The key is not found in the tree.\n");
         else
@@ -573,7 +732,7 @@ int FindKey(Table* T, Node** root, int key, int a)
         if (!FindKeyTable(T, key, 1, root))
             return 0;
         else
-            if (FindKeyTree(root, key) != NULL)
+            if (FindKeyTree(root, key, 0) != NULL)
                 return 0;
             else
                 return 1;
@@ -679,9 +838,10 @@ int create(Table* T, int sz)
         return 1;
     return 0;
 }
-//вывод всех ключей в порядке возрастания           +
+/*вывод всех ключей в порядке возрастания           +
+key1-от какого, key2-до какого (key1 < key2)*/
 int MIN(Node* N, int key1, int key2)
-{//key1-от какого, key2-до какого (key1 < key2)
+{
     if (N != NULL) {                        //Пока не встретится пустой узел
         for (int k = 0; k <= 3; k++) {
             if (MIN(N->ptr[k], key1, key2)) //Рекурсивная функция
@@ -698,7 +858,8 @@ int MIN(Node* N, int key1, int key2)
     }
     return 0;
 }
-//-возврат элемента, соответствующего ключу с максимальным значением   
+/*-возврат элемента, соответствующего               +
+ключу с максимальным значением*/   
 Item* MAX(Table* T, Node** root)
 {
     int kMAX, k = 0, o, j;
@@ -713,6 +874,8 @@ Item* MAX(Table* T, Node** root)
                 o = k;
             }
     }
+    if (*root==NULL)
+        return T->arr[o];
     Node* N = *root;
     while (1) {
         for (j = 0; N->arr[j] != NULL && j < 3; j++);
@@ -785,7 +948,7 @@ int hash(int key, Table* T)
     return key % T->size;
 }
 //Поиск ключа в кеш таблице                         +
-int FindKeyTable(Table* T, int key, int a, Node** root) {
+int FindKeyTable(Table* T, int key, int a) {
     int i = hash(key, T), j;
     if (a == 1) {
         if (T->arr[i] != NULL) {
@@ -815,7 +978,7 @@ int CheckTableFree(Table* T)
     return 0;
 }
 //пустое дерево                                     +
-int CheckTreeFree(Node*root)
+int CheckTreeFree(Node* root)
 {
     if (root == NULL) {
         printf("Tree is free.\n");
