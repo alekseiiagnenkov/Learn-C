@@ -107,6 +107,7 @@ int CheckTableFree(Table*);            //пустая таблицы
 int choose(Table*);                    //выбор для добавления элементов
 int FindKeyTable(Table*, int, int);  //проверка ключа
 void DelItem(Item*);
+Node* SearchReplacement(Node*, int*, int*);
 //[ФУНКЦИИ ВВОДА]
 int getInt(int*);                      //чтение целого числа
 char* getstr();                        //функция ввода строк
@@ -167,6 +168,7 @@ int F2_Generate(Table* T, Node** root)
 {
     printf("\n      [GENERATE RANDOM TABLE]");
     int key, n, j, k = 0;
+    srand(time(NULL));
     if ((n = choose(T)) == 0)
         return 0;
     for (int i = 0; i < n; i++) {
@@ -262,12 +264,18 @@ int F4_DeleteRelease(Table* T, Node** root)
     }
     else
         N = DeleteKeyTree(&N, key);
-    if (N->n != 0) {
-        if (N->parent == NULL)
-            *root = N;
+    if (N != NULL) {
+        if (N->n != 0) {
+            if (N->parent == NULL)
+                *root = N;
+        }
     }
     else
         *root = NULL;
+    N = *root;
+    if (N->ptr[0] != NULL)
+        if (N->n == 1 && N->ptr[0]->n == 1 && N->ptr[1]->n == 1)
+            ProcessingNode(*root, root);
     printf("The Item was deleted.\n");
     return 0;
 }
@@ -347,7 +355,7 @@ int F9_Timing()
     printf("\n      [TAIMING]\n");
     Node* root = NULL;
     Item* I;
-    int n = 10, k, cnt = 100000, i, m, j, size=1000;
+    int n = 100, k, cnt = 50000, i, m, j, size=50000;
     int* key = (int*)malloc(sizeof(int)*10000);
     clock_t first, last;
     Table* T = (Table*)malloc(sizeof(Table));
@@ -379,8 +387,8 @@ int F9_Timing()
             if (!(FindKey(T, &root, key[i], 2)))
                 m++;
         last = clock();
-        printf("%d items was found\n", m);
-        printf("test #%d, number of nodes = %d, time = %d\n", 10 - n, (10 - n) * cnt, last - first);
+        printf("\n%d items was found\n", m);
+        printf("test #%d, number of nodes = %d, time = %d\n", 100 - n, (100 - n) * cnt, last - first);
         //printf("Theoretical value:%lf\n\n", log2((10-n)*cnt/3));
     }
     DeletTree(root);
@@ -521,17 +529,17 @@ Node* ProcessingNode(Node* N, Node** root)
     N->ptr[0]->n = 3;
     free(N->ptr[1]);
     N->ptr[1] = NULL;
+    N = N->ptr[0];
+    free(N->parent);
+    N->parent = NULL;
     if (N->parent == NULL) {
-        *root = N;
-        free(N);
-        N->parent = NULL;
-        return N;
-    }
-    else
-        if (N->parent!=NULL) {
-            fixNode(N->parent, SearchPTR(N->parent, N->arr[0]->key));
-
+        if (*root != N) {
+            *root = N;
+            return N;
         }
+        else
+            return N;
+    }
         //else {
         //    N->ptr[0]->parent = N->parent;
         //    N->parent->ptr[SearchPTR(N->parent, N->arr[0]->key)] = N->ptr[0];
@@ -593,79 +601,105 @@ void DeletTree(Node* N)
         }
     }
 }
-//удаление элемента из дерева                       ?(12 элементов-нормально)
+//удаление элемента из дерева                       ?
 Node* DeleteKeyTree(Node** root, int key)
 {
     Node* n = *root; //нужен для преобразований и поиска
     Node* N = *root; //указывает на узел с удаляемым элементом
-    int i = SearchPTR(n, key), j = 0, k = 1, flag=1;
-    if (n->ptr[0]!=NULL) {               //если имеет поддеревья, то ищем замену
-        n = n->ptr[i + 1];
-        while (n->ptr[0] != NULL)        //пока не найдем минимальный ключ в правом поддереве
-            n = n->ptr[0];
-        if (n->n == 1) {                 //если он 1, то можно поискать в левом поддереве
-            n = *root;
-            k = i;
-            while (n->ptr[i] != NULL){   //пока не найдем минимальный ключ в левом поддереве
-                n = n->ptr[k];
-                k = 0;
-                while (n->arr[k]!=NULL && k<3){//находим максимальный ключ последнем узле левого поддерева
-                    k++;
-                }
-            }
+    Node* n1 = *root;
+    int i = SearchPTR(n, key), j = 1, k = 1, flag = 1, h=0;
+    if (n->ptr[0] != NULL) {             //если имеет поддеревья, то ищем замену
+        j = 0;
+        h = i;
+        n = SearchReplacement(n, &h, key);
+        if (n == NULL) {
+            free(N->arr[0]);
+            free(N);
+            return NULL;
         }
         DelItem(N->arr[i]);
-        N->arr[i] = n->arr[k-1];
-        key = n->arr[k-1]->key;          //теперь нам нужно удалить элемент, который заменил удаляемый элемент
-        i = k-1;
+        if (h == 0)
+            h++;
+        N->arr[i] = n->arr[h - 1];
+        key = n->arr[h - 1]->key;        //теперь нам нужно преобразовать B-дерево
+        i = h - 1;
     }
     if (n->ptr[0] == NULL) {             //если не имеет поддеревьев
+        if (j)
+            DelItem(n->arr[i]);
         n->arr[i] = NULL;
         n->n--;
-        if (n->n > 0) {                  //если он был не один в узле
+        if (n->n > 0)                    //если он был не один в узле
             ShiftNode(n, 1, n->n);
-        }
         else {                           //если он был единственным в узле
-            n = fixNode(n->parent, SearchPTR(n->parent, key)); //возвращает родителя
-            if (n->parent==NULL)
-                N = n;
-            while (n->n == 0) {          //пока в узле 0 элементов
-                if (n->parent != NULL) { //если родитель есть
-                    n = fixNode(n->parent, SearchPTR(n->parent, key));//возвращает родителя
-                    continue;
-                }
-                else {                   //если родителя нет 
-                    N = n;
-                    break;
-                }
+            if (n->parent != NULL) {
+                n1 = n;
+                n = fixNode(n->parent, SearchPTR(n->parent, key), key); //возвращает родителя
+                if (n->parent != NULL)
+                    if (n->parent->n == 0) {
+                        free(n->parent);
+                        n->parent = NULL;
+                        N = n;
+                    }
+                while (n->n == 0)            //пока в узле 0 элементов
+                    if (n->parent != NULL) { //если родитель есть
+                        n = fixNode(n->parent, SearchPTR(n->parent, key), key);//возвращает родителя
+                        continue;
+                    }
+                    else {                   //если родителя нет 
+                        N = n;
+                        break;
+                    }
+                ShiftNode(n, 2, n->n);
             }
-            ShiftNode(n, 2, n->n);
         }
+    }
+    if (N->n == 0) {
+        n1 = NULL;
+        free(N);
+        if (N == n)
+            n = NULL;
+        N = NULL;
+        return n;
     }
     return N;
 }
 /*изменение дерева (i=0-поворот ключей вправо,      ?
 для остальных случаев влево), поступает родитель*/ 
-Node* fixNode(Node* n, int i) 
+Node* fixNode(Node* n, int i, int key) 
 {//0<=i<=3
- //считаем, что поддеревья данного узла не имеют своих поддеревьев
+    Node* N;
     int flag = 0, j=0;
     while (flag == 0) {
-        if (n->arr[i] == NULL) { //поворот влево
-            if (n->ptr[i - 1]->n == 3)  //если в узле, в сторону которого выполняется поворот находится 3 элемента, то 
+        if (n->arr[i] == NULL || i==3) { //поворот влево
+            if (n->ptr[i - 1]->n > 1)    //если в узле, в сторону которого выполняется поворот находится 3 элемента, то 
                 i--;
             else { //если все хорошо
                 n->ptr[i - 1]->arr[SearchPTR(n->ptr[i - 1], n->arr[i - 1]->key)] = n->arr[i - 1];
-                n->arr[i - 1] = NULL;              //       a b X       X-NULL
-                free(n->ptr[i]);                   //     /  | |  \      
-                n->ptr[i] = NULL;                  //    c  d   e   X
+                n->ptr[i - 1]->n++;
+                n->arr[i - 1] = n->ptr[i]->arr[0];
+                n->ptr[i]->arr[0] = NULL;
+                if (n->ptr[i]->n>1)
+                n->ptr[i]->n--;
+                if (n->ptr[i]->n > 0)
+                    ShiftNode(n->ptr[i], 1, n->ptr[i]->n);
+                else
+                    n->ptr[i] = NULL;
+                n->n--;
                 flag = 1;
             }
         }
         else {     //поворот вправо
             if (n->ptr[i + 1] != NULL)
-                if (n->ptr[i + 1]->n == 3)
-                    i--;
+                if (n->ptr[i + 1]->n > 1) {
+                    if (i != 0)
+                        i--;
+                    else {
+                        i++;
+                        continue;
+                    }
+                }
+            if (n->ptr[i + 1]!=NULL)
             ShiftNode(n->ptr[i + 1], 2, 0);
             n->ptr[i + 1]->arr[0] = n->arr[i];
             n->ptr[i + 1]->n++;
@@ -678,20 +712,98 @@ Node* fixNode(Node* n, int i)
                 n->arr[i] = NULL;
                 n->ptr[i] = NULL;
             }
+            if (n->arr[i]==NULL)
             n->n--;
+            if (n->n!=3)
             ShiftNode(n, 1, n->n);
-            if (n->ptr[i]->n == 0) { //если в поддереве не осталось элементов, то
-                free(n->ptr[i]);
-                n->ptr[i] = NULL;
-                if (i != 0) {          //делаем сдвиг для него, пока он не станет крайним
-                    i--;
-                    continue;
-                }
-            }
             flag = 1;
+            if (i<3)
+                if (n->ptr[i + 1]->parent->arr[i] == NULL) {
+                    n->ptr[i] = n->ptr[i + 1];
+                    n->ptr[i + 1] = NULL;
+                }
         }
         for (j = 0; n->arr[j] != NULL; j++); //cчитаем кол-во узлов в узле
         n->n = j;
+    }
+    if (n->n == 0) {
+        if (n->parent == NULL)
+            return n->ptr[0];
+    }
+
+    return n;
+}
+//поиск замены (возвращает элемент, из которого нужно взять Item) +
+Node* SearchReplacement(Node* n, int* i, int key)
+{
+    Node* N = n;
+    Node* n1 = N;
+    int k = 1, j = 1, l = 0;
+    if (n->ptr[0] != NULL) {              //если существуют дочерние узлы
+        n = n->ptr[*i + 1];
+        while (n->ptr[0] != NULL) {       //пока не найдем минимальный ключ в правом поддереве
+            n = n->ptr[0];
+            j++;
+        }
+        if (n->n == 1) {                  //если он 1, то можно поискать в левом поддереве
+            n1 = N;
+            k = *i;
+            while (n1->ptr[k] != NULL) {  //пока не найдем минимальный ключ в левом поддереве
+                n1 = n1->ptr[k];
+                k = n->n;
+                l++;
+            }
+            k = 0;
+            while (n1->arr[k] != NULL && k < 3) //находим максимальный ключ последнем узле левого поддерева
+                k++;
+            *i = k;
+        }
+        if (j <= l)
+            n = n1;
+    }
+    else {   //если дочерние элементы не существуют
+        if (n->parent != NULL) {
+            n = n->parent;
+            n1 = n;
+            *i = SearchPTR(n, key);
+            if (*i > 0 && *i < 3) //если справа и слева есть элемент, то возвращаем их
+                return n;
+            else { //Если одного из родителей нет, то
+                if (*i == 0) {
+                    n1 = n;
+                    if (n->ptr[*i + 1]->n > 1)  //если у брата справа больше 1 Item
+                        return n;
+                    while (n->parent != NULL) { //поиск замены
+                        n = n->parent;
+                        if (n->arr[SearchPTR(n, key) - 1]->key < key) {
+                            j = 0;
+                            break;
+                        }
+                    }
+                }
+                else {
+                    n1 = n;
+                    if (n->ptr[*i - 1]->n > 1)  //если у брата слева больше 1 Item
+                        return n;
+                    while (n->parent != NULL) { //поиск замены
+                        n = n->parent;
+                        *i = SearchPTR(n, key);
+                        if (i < 3)
+                            if (n->arr[*i]->key > key) {
+                                j = 0;
+                                break;
+                            }
+                    }
+                }
+                if (j) //если не нашли замену, то возвращаем родителя
+                    return n1;
+                if (n1->n > n->n)
+                    return n1;
+                else
+                    return n;
+            }
+        }
+        return NULL;
     }
     return n;
 }
