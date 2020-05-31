@@ -1,0 +1,659 @@
+/* Вариант 2
+Написать программу для работы по запросам оператора с неориентированным графом.
+Каждая вершина графа имеет уникальное имя и задается координатами на плоскости {х,у}.
+Граф задается списками смежностей.
+
+Предусмотреть следующие операции:
+-	добавление новой вершины в граф;                                                    +
+-	добавление в граф нового ребра между двумя заданными вершинами;                     +
+-	удаление заданной вершины из графа; при этом удаляются и все ребра, связанные с     +
+удаляемой вершиной;
+-	поиск всех вершин, связанных с некоторой заданной вершиной;                         +
+-	вывод графа.                                                                        +
+
+Примечания:
+1.	Программа должна содержать несколько функций; функция main () должна выполнять:     +
+вывод меню, ввод и анализ ответа, вызов на исполнение требуемой функции.
+2.	Программа должна генерировать граф случайным образом.                               +
+3.	Граф должен храниться в файле; в начале сеанса работы он загружается из файла;      +
+если в процессе работы граф был изменен, новое состояние должно быть сохранено в файле.
+4.	В программе нужно предусмотреть проверку правильности ввода данных.                 +
+5.	Оценить сложность реализованных алгоритмов.                                         +
+6.	Провести таймирование (или профилирование) алгоритма поиска связных вершин.         +
+*/
+
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
+#include <time.h>
+#include <malloc.h>
+#include <string.h>
+#include <stdbool.h>
+
+typedef struct Vertex {    //структура вершины
+	char* name;            //имя вершины
+	int x;                 //координата Х
+	int y;                 //координата Y
+	struct Adjacent* head; //список смежности данной вершины
+	int count;             //количество смежных вершин
+}Vertex;
+typedef struct Adjacent {  //односвязный список смежности
+	Vertex* Verb;          //указатель на вершину
+	int n;                 //индекс в общем массиве
+	struct Adjacent* next; //указатель на следующую смежную вершину
+} Adjacent;
+typedef struct Graph {     //структура графа
+	Vertex** Vert;         //массив вершин
+	int count;             //текущий размер графа
+	int size;              //размер графа
+}Graph;
+//          [МЕНЮ]
+void F0_Menu();                //меню
+int F1_Exit(Graph*);           //завершение программы
+void F2_Random(Graph*);        //создание рандомного графа
+void F3_AddVertex(Graph*);     //добавление вершины
+void F4_AddCommunication(Graph*);//добавление ребра
+void F5_DeleteVert(Graph*);    //удаление вершины
+void F6_PrintGraph(Graph*);    //вывод графа 
+void F7_Search(Graph*);        //поиск
+void F8_FreeGraph(Graph*);     //удаление графа
+void F9_Timing();              //таймирование
+//         [СОЗДАНИЕ]
+int CommunicationVerb(Graph*, Vertex*, Vertex*);
+Vertex* CreateVertex(Graph*, int, int, char*);
+void RandomGraph(Graph*, int, int);
+void RandomStr(char*, int);
+//          [ФАЙЛ]
+int Load(Graph*, char*);
+void Save(Graph*, const char*);
+//         [УДАЛЕНИЕ]
+void DeleteCommunication(Vertex*, Vertex*);
+void DeleteVertex(Graph*, int);
+//          [ПОИСК]
+int FindVertex(Graph*, char*);
+//          [ОБЩИЕ]
+int AdjacencyСheck(Graph*, int, int);
+int CheckGraph(Graph*);
+//          [ВВОД]
+char* GetStr(char*);    //ввод строчки
+int GetInt(int*, char*); //ввод числа
+
+const char* msgs[] = { NULL, "Exit programm", "Random Graph", "Add Vertex", "Add Communication", "Delete", "Print graph", "Search", "Clear Graph", "Timing" };
+//Главная функция                           +
+int main()
+{
+	Graph G = { NULL, 0, 0 };
+	int ex = 0, menu = -1, flag = 0, choose;
+	int(*fun1[]) (Graph*) = { NULL, F1_Exit, F2_Random, F3_AddVertex, F4_AddCommunication, F5_DeleteVert, F6_PrintGraph, F7_Search, F8_FreeGraph, F9_Timing };
+	G.Vert = (Vertex*)calloc(1, sizeof(Vertex));
+	G.size = 0;
+	char* filename = (GetStr("Enter the file's name:"));
+	Search(&G, filename);
+	F0_Menu();
+	//выбор пункта меню
+	while (ex != 1) {
+		menu = -1;
+		flag = 0;
+		while (menu <= -1 || menu >= 10) {
+			if (flag == 1)
+				printf("Error!\n");
+			GetInt(&menu, "Selected action (0 - Menu):");
+			flag = 1;
+		}
+		if (menu == 0)
+			F0_Menu();
+		else
+			ex = (*fun1[menu])(&G, filename);
+	}
+	return 0;
+}
+
+
+//            [МЕНЮ]
+//Вывод меню                                +
+void F0_Menu()
+{
+	printf("\n      [MENU]\n");
+	for (int i = 1; i < 10; ++i)
+		printf("[%d] %s\n", i, msgs[i]);
+}
+//Выход + Сохранение                        +
+int F1_Exit(Graph* G, char* filename) {
+	if (CheckGraph(G)) {
+		free(G->Vert);
+		return 1;
+	}
+	else {
+		Save(G, filename);
+		F8_FreeGraph(G);
+		printf("Graph was saved and deleted.");
+		return 1;
+	}
+}
+//создание рандомного графа                 +
+void F2_Random(Graph* G)
+{
+	int V, E, flag = 0;
+	do {
+		if (flag)
+			puts("too many edges: (ne <= nv*(nv-1)/2)");
+		GetInt(&V, "Enter the number of vertexes:");
+		GetInt(&E, "Enter the number of edges:");
+		flag = 1;
+	} while (E > V * (V - 1) / 2);
+	RandomGraph(G, V, E);
+}
+//добавление вершины(только вершины, без ребер)  +
+void F3_AddVertex(Graph* G)
+{
+	int x, y, flag = 0;
+	char* str;
+	G->Vert = (Vertex*)realloc(G->Vert, (G->size + 1) * sizeof(Vertex));
+	G->size++;
+	do {
+		if (flag) {
+			printf("Vertex already exists. Use another name!\n");
+		}
+		str = GetStr("Enter the vertexs' name:");
+		flag = 1;
+	} while (FindVertex(G, str) != -1);
+	GetInt(&x, "Enter the X coord: ");
+	GetInt(&y, "Enter the Y coord: ");
+	CreateVertex(G, x, y, str);
+	G->count++;
+	free(str);
+}
+//создание связи между вершинами            +
+void F4_AddCommunication(Graph* G)
+{
+	char* str;
+	int i = 0, V1, V2;
+	str = GetStr("Enter the vertexs'-1 name:");
+	V1 = FindVertex(G, str);
+	free(str);
+	if (V1 == -1) {
+		printf("The vertex is not found.\n");
+		return 0;
+	}
+	str = GetStr("Enter the vertexs'-2 name:");
+	V2 = FindVertex(G, str);
+	free(str);
+	if (V2 == -1) {
+		printf("The vertex is not found.\n");
+		return 0;
+	}
+	if (V1 == V2) {
+		printf("It is one vertex.\n");
+		return 0;
+	}
+	if (AdjacencyСheck(G, V1, V2))
+		printf("Vertexes have communication.\n");
+	else
+		CommunicationVerb(G, G->Vert[V1], G->Vert[V2]);
+}
+//удаление вершины                          +
+void F5_DeleteVert(Graph* G)
+{
+	if (CheckGraph(G))
+		return 0;
+	char* name;
+	int i = 0, V;
+	name = GetStr("Enter vertexs' name:");
+	V = FindVertex(G, name);
+	if (V == -1) {
+		printf("The vertex wasn't found.\n");
+		return 0;
+	}
+	DeleteVertex(G, V);
+}
+//вывод графа                               +
+void F6_PrintGraph(Graph* G)
+{
+	if (CheckGraph(G))
+		return 0;
+	printf("\nVertices:\n");
+	int i = 0;
+	printf("Ind:     Name:    Coord:\n");
+	for (i = 0; i < G->count; i++) {
+		printf("\n");
+		printf("[%d]  %7s      {%d;%d}\n", i, G->Vert[i]->name, G->Vert[i]->x, G->Vert[i]->y);
+		if (G->Vert[i]->head != NULL) {
+			Adjacent* V = G->Vert[i]->head;
+			while (1) {
+				if (V->Verb != NULL)
+					printf("           --%s|%d\n", V->Verb->name, V->n);
+				else
+					break;
+				if (V->next == NULL)
+					break;
+				else
+					V = V->next;
+			}
+		}
+	}
+}
+//поиск                                     +
+void F7_Search(Graph* G)
+{
+	if (CheckGraph(G))
+		return 0;
+	char* name;
+	int V;
+	name = GetStr("Enter vertexs' name:");
+	V = FindVertex(G, name);
+	if (V == -1) {
+		printf("The vertex wasn't found.");
+		return;
+	}
+	int* color = (int*)calloc(G->size, sizeof(int)); //0-белая,1-серая,-1-черная.
+	SearchAdjacent(G, name, 0, color);
+	free(color);
+}
+//удаление графа                            +
+void F8_FreeGraph(Graph* G)
+{
+	int i = 0;
+	for (i = 0; i < G->count; i++) {
+		if (G->Vert[i]->head != NULL) { //удаление списка смежности
+			Adjacent* V = G->Vert[i]->head;
+			Adjacent* last;
+			while (1) {
+				last = V;
+				if (V->next == NULL)
+					break;
+				else
+					V = V->next;
+				free(last);
+			}
+			free(V);
+		}
+		free(G->Vert[i]->name);
+	}
+	free(G->Vert);
+	G->Vert = NULL;
+	G->size = 0;
+	G->count = 0;
+}
+//таймирование                              +
+void F9_Timing()
+{
+	Graph G = { NULL, 0, 0 };
+	G.Vert = (Vertex*)calloc(1, sizeof(Vertex));
+	G.size = 0;
+	int n = 10, E = 5000, V = 5000, i, Nnames = 1000;
+	char** names = (char**)calloc(1000, sizeof(char*));
+	clock_t first, last;
+	srand(time(NULL));
+	while (n-- > 0) {
+		RandomGraph(&G, V, E);                          //V-количество вершин, E-количество ребер 
+		for (i = 0; i < Nnames; i++) {
+			names[i] = (char*)calloc(4, sizeof(char));
+			RandomStr(names[i], 3);
+		}
+		int* color = (int*)calloc(G.size, sizeof(int)); //0-белая, 1-серая, -1-черная.
+		first = clock();
+		for (i = 0; i < Nnames; i++) {
+			SearchAdjacent(&G, names[i], 1, color);
+		}
+		last = clock();
+		free(color);
+		printf("test #%d, number of vertex = %d, number of edges = %d,  time = %d\n", 10 - n, (10 - n) * V, (10 - n) * E, last - first);
+		for (i = 0; i < Nnames; i++)
+			free(names[i]);
+	}
+	free(names);
+	F8_FreeGraph(&G);
+}
+
+
+//           [ПОИСК]
+//поиск вершины по названию                 +
+int FindVertex(Graph* G, char* name)
+{
+	int i;
+	if (G->count != 0)
+		for (i = 0; i < G->count; i++)
+			if (!strcmp(G->Vert[i]->name, name))
+				return i;
+	return -1;
+}
+//поиск смежных вершин                      +
+int SearchAdjacent(Graph* G, char* name, int a, int* color) {
+
+	int n = FindVertex(G, name);   //поиск заданной вершины в графе
+	if (n == -1)
+		return 0;                  //если не найдена, то выходим
+	Adjacent* A = G->Vert[n]->head;//получаем указатель на матрицу смежности для данной вершины
+	color[n] = -1;
+	for (int i = 0; i < G->Vert[n]->count; i++) {
+		if (color[A->n] == 0) {
+			if (a == 0)
+				printf(" %s\n", A->Verb->name);
+			color[A->n] = 1;
+		}
+		A = A->next;
+	}
+	A = G->Vert[n]->head;
+	for (int i = 0; i < G->Vert[n]->count; i++) {
+		if (color[A->n] != -1) {
+			SearchAdjacent(G, A->Verb->name, a, color);
+		}
+		A = A->next;
+	}
+}
+
+
+//          [УДАЛЕНИЕ]
+//удаление вершины                                        +
+void DeleteVertex(Graph* G, int v)
+{
+	if (G->Vert[v]->head != NULL)  //удаление списка смежности
+		if (G->Vert[v]->head->Verb != NULL) {
+			Adjacent* V = G->Vert[v]->head;
+			Adjacent* last;
+			while (1) {
+				last = V;
+				if (V->next == NULL) {
+					DeleteCommunication(G->Vert[v], last->Verb);
+					free(V);
+					break;
+				}
+				else
+					V = V->next;
+				DeleteCommunication(G->Vert[v], last->Verb);
+				free(last);
+			}
+			//DeleteCommunication(G->Vert[v], last->Verb);
+			//free(V);
+		}
+	free(G->Vert[v]->name);
+	G->Vert[v] = G->Vert[G->count - 1];
+	G->Vert[G->count - 1] = NULL;
+	G->count--;
+	G->Vert = (Vertex*)realloc(G->Vert, (G->size - 1) * sizeof(Vertex));
+	G->size--;
+}
+//удаление заданной вершины из списка смежности           +
+void DeleteCommunication(Vertex* v1, Vertex* v2)
+{//v1-что удаляем, v2-откуда удаляем
+	Adjacent* V = v2->head;
+	Adjacent* last = V;
+	int i = 0;
+	while (V->Verb != v1) {
+		last = V;
+		V = V->next;
+		i++;
+	}
+	if (i != 0) {
+		if (V->next != NULL)
+			last->next = V->next;
+		else
+			last->next = NULL;
+	}
+	else {
+		if (V->next != NULL)
+			v2->head = V->next;
+		else
+			v2->head = NULL;
+	}
+	free(V);
+}
+
+
+//           [ФАЙЛ]
+//загрузка таблицы                                        +                                
+int Search(Graph* G, char* filename)
+{
+	int choose = 1;
+	printf("Upload data from a file?\nYes[1]    No[2]\n");
+	do {
+		if (choose != 1 && choose != 2)
+			printf("Error! Repeat:");
+		GetInt(&choose, "Enter:");
+		if (choose == 0 || choose == 2) {
+			return 0;
+		}
+	} while (choose != 1 && choose != 2);
+	if (Load(G, filename) == 0) {
+		printf("File wasn't found.");
+	}
+	return 0;
+}
+//считываем информацию из файла(если он существует)       +                  
+int Load(Graph* G, char* filename)
+{
+	int i = 0, n;
+	FILE* file = fopen(filename, "r+b");
+	if (file == NULL)
+		return 1;
+	char name[10];
+	char* Name;
+	fseek(file, sizeof(int), SEEK_SET);
+	fread(&G->size, sizeof(int), 1, file);
+	G->count = 0;
+	G->Vert = (Vertex*)calloc(G->size, sizeof(Vertex));
+	for (int i = 0; i < G->size; i++) {
+		Vertex* V = (Vertex*)calloc(1, sizeof(Vertex));
+		V->head = (Adjacent*)calloc(1, sizeof(Adjacent));
+		fread(&name, sizeof(char*), 1, file);
+		fread(&V->x, sizeof(int), 1, file);
+		fread(&V->y, sizeof(int), 1, file);
+		fread(&V->count, sizeof(int), 1, file);
+		V->name = _strdup(name);
+		G->Vert[i] = V;
+		G->count++;
+	}
+	for (int i = 0; i < G->size; i++) {
+		Adjacent* A = G->Vert[i]->head;
+		if (G->Vert[i]->count != 0)
+			for (int j = 0; j < G->Vert[i]->count; j++) {
+				fread(&name, sizeof(char*), 1, file);
+				//fread(&A->n, sizeof(int), 1, file);
+				Name = _strdup(name);
+				if (AdjacencyСheck(G, i, FindVertex(G, Name)))  //проверка на существование связи
+					continue;
+				else {
+					G->Vert[i]->count--;
+					G->Vert[FindVertex(G, Name)]->count--;
+					CommunicationVerb(G, G->Vert[i], G->Vert[FindVertex(G, Name)]);
+				}
+			}
+	}
+	fclose(file);
+	return 1;
+}
+//сохранение графа в файл                                 +
+void Save(Graph* G, char* filename)
+{
+	FILE* file = fopen(filename, "w+b");
+	if (!file) return;
+	fseek(file, sizeof(int), SEEK_SET);
+	fwrite(&G->count, sizeof(int), 1, file);
+	for (int i = 0; i < G->count; i++) {
+		fwrite(G->Vert[i]->name, sizeof(char) * (strlen(G->Vert[i]->name) + 1), 1, file);
+		fwrite(&G->Vert[i]->x, sizeof(int), 1, file);
+		fwrite(&G->Vert[i]->y, sizeof(int), 1, file);
+		fwrite(&G->Vert[i]->count, sizeof(int), 1, file);
+	}
+	for (int i = 0; i < G->count; i++) {
+		Adjacent* A = G->Vert[i]->head;
+		for (int j = 0; j < G->Vert[i]->count; j++) {
+			fwrite(A->Verb->name, sizeof(char) * (strlen(A->Verb->name) + 1), 1, file);
+			A = A->next;
+		}
+	}
+	fclose(file);
+	printf("Graph was saved.");
+}
+
+
+//         [ДОБАВЛЕНИЕ/СОЗДАНИЕ]
+//создание вершины                                                 +
+Vertex* CreateVertex(Graph* G, int x, int y, char* name)
+{
+	int i = 0;
+	Vertex* v = (Vertex*)calloc(1,sizeof(Vertex));
+	v->name = _strdup(name);
+	v->x = x;
+	v->y = y;
+	v->head = (Adjacent*)calloc(1, sizeof(Adjacent));
+	for (i = 0; G->Vert[i] != NULL && i < G->count; i++);
+	if (i == G->size) {
+		G->Vert = (Vertex*)realloc(G->Vert, (G->size + 1) * sizeof(Vertex));
+		G->size++;
+	}
+	G->Vert[i] = v;
+	return v;
+}
+//создание рандомного набора букв                                  +
+void RandomStr(char* buf, int l)
+{
+	for (int i = 0; i < l; i++)
+		buf[i] = rand() % 28 + 'A';
+	buf[l] = '\0';
+}
+//создание рандомного графа                                        +
+void RandomGraph(Graph* G, int V, int E)
+{
+	F8_FreeGraph(G); //очистка прошлого графа, если он был
+	G->Vert = (Vertex*)calloc(V, sizeof(Vertex));
+	G->size = V;
+	char name[4];
+	int i = 0;
+	for (int t = 0; t < V; t++) {
+		RandomStr(name, 3);
+		if (G->count != 0)
+			if (FindVertex(G, name) != -1) {
+				t--;
+				continue;
+			}
+		CreateVertex(G, rand() % 1000, rand() % 1000, name); //создание вершины
+		G->count++;
+	}
+	for (int t = 0; t < E; t++)
+		if (CommunicationVerb(G, NULL, NULL))
+			t--;
+}
+//создание связи между вершинами                                   +
+int CommunicationVerb(Graph* G, Vertex* v1, Vertex* v2) {
+	Adjacent* N1;
+	Adjacent* N2;
+	Vertex* V1 = v1;
+	Vertex* V2 = v2;
+	if (v1 == NULL && v2 == NULL) { //если работает рандом
+		int n1 = rand() % G->size;
+		int n2 = rand() % G->size;
+
+		if (n1 == n2)
+			return 1;
+		if (AdjacencyСheck(G, n1, n2))
+			return 1;
+		N1 = G->Vert[n1]->head;
+		N2 = G->Vert[n2]->head;
+		G->Vert[n1]->count++;
+		G->Vert[n2]->count++;
+		V1 = G->Vert[n1];
+		V2 = G->Vert[n2];
+	}
+	else { //если добавление ребра
+		N1 = v1->head;
+		N2 = v2->head;
+		v1->count++;
+		v2->count++;
+	}
+	if (N1 != NULL) {
+		while (N1->Verb != NULL) {
+			if (N1->next == NULL) {
+				N1->next = (Adjacent*)calloc(1, sizeof(Adjacent));
+				N1 = N1->next;
+				N1->next = NULL;
+			}
+			else
+				N1 = N1->next;
+		}
+		N1->Verb = V2;
+	}
+	if (N2 != NULL) {
+		while (N2->Verb != NULL) {
+			if (N2->next == NULL) {
+				N2->next = (Adjacent*)calloc(1, sizeof(Adjacent));
+				N2 = N2->next;
+				N2->next = NULL;
+			}
+			else
+				N2 = N2->next;
+		}
+		N2->Verb = V1;
+	}
+	N1->n = FindVertex(G, N1->Verb->name);
+	N2->n = FindVertex(G, N2->Verb->name);
+	return 0;
+}
+
+
+//            [ВВОД]
+//ввод числа                             +
+int GetInt(int* pa, char* q)
+{
+	printf(q);
+	int n;
+	do {
+		n = scanf("%d", pa);
+		if (n < 0)
+			return 0;
+		if (*pa < 0)
+			n = 0;
+		if (n == 0) {
+			printf("Error! Repeat:\n");
+			scanf("%*[^\n]");
+		}
+	} while (n == 0);
+	scanf("%*c");
+	return n < 0 ? 0 : 1;
+}
+//ввод строчки                           +
+char* GetStr(char* q)
+{
+	printf(q);
+	char* ptr = (char*)malloc(1);
+	char buf[81];
+	int n, len = 0;
+	*ptr = '\0';
+	do {
+		n = scanf("%80[^\n]", buf);
+		if (n < 0) {
+			free(ptr);
+			ptr = NULL;
+			continue;
+		}
+		if (n == 0)
+			scanf("%*c");
+		else {
+			len += strlen(buf);
+			ptr = (char*)realloc(ptr, len + 1);
+			strcat(ptr, buf);
+		}
+	} while (n > 0);
+	return ptr;
+}
+
+
+//            [ОБЩИЕ]
+//проверка графа на пустоту              +
+int CheckGraph(Graph* G)
+{
+	if (G->count == 0) {
+		printf("The graph is free.\n");
+		return 1;
+	}
+	return 0;
+}
+//проверка смежности двух вершин         +
+int AdjacencyСheck(Graph* G, int V1, int V2)
+{//1 - yes, 2 - No
+	int i;
+	Adjacent* V = G->Vert[V1]->head;
+	for (V; V->Verb != G->Vert[V2] && V->next != NULL; V = V->next);
+	if (V->Verb != G->Vert[V2])
+		return 0;
+	return 1;
+}
