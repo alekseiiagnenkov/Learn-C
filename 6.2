@@ -28,6 +28,7 @@
 #include <math.h>
 #include <malloc.h>
 #include <string.h>
+#include <stdlib.h>
 
 typedef struct Vertex {    //структура вершины
 	char* name;            //имя вершины
@@ -123,7 +124,7 @@ int F1_Exit(Graph* G, char* filename) {
 	else {
 		Save(G, filename);
 		F8_FreeGraph(G);
-		printf("Graph was saved.\n");
+		printf("Graph is saved.\n");
 		return 1;
 	}
 }
@@ -140,7 +141,7 @@ void F2_Random(Graph* G)
 		flag = 1;
 	} while (E > V * (V - 1) / 2);
 	RandomGraph(G, V, E, 1);
-	printf("Graph created.\n");
+	printf("Graph is created.\n");
 }
 //добавление вершины(только вершины, без ребер)  +
 void F3_AddVertex(Graph* G)
@@ -159,7 +160,7 @@ void F3_AddVertex(Graph* G)
 	GetInt(&y, "Enter the Y coord: ");
 	CreateVertex(G, x, y, str);
 	free(str);
-	printf("Vertex added.\n");
+	printf("Vertex is added.\n");
 }
 //создание связи между вершинами            +
 void F4_AddCommunication(Graph* G)
@@ -191,7 +192,7 @@ void F4_AddCommunication(Graph* G)
 	}
 	else
 		CommunicationVerb(G, G->Vert[V1], G->Vert[V2]);
-	printf("Communication added.\n");
+	printf("Communication is added.\n");
 }
 //удаление вершины                          +
 void F5_DeleteVert(Graph* G)
@@ -208,7 +209,7 @@ void F5_DeleteVert(Graph* G)
 		return 0;
 	}
 	DeleteVertex(G, V);
-	printf("The vertex deleted.\n");
+	printf("The vertex is deleted.\n");
 }
 //вывод графа                               +
 void F6_PrintGraph(Graph* G)
@@ -279,7 +280,7 @@ void F8_FreeGraph(Graph* G)
 	free(G->Vert);
 	G->Vert = NULL;
 	G->size = 0;
-	printf("Memory cleaned.\n");
+	printf("Memory is cleaned.\n");
 }
 //таймирование                              +
 void F9_Timing()
@@ -329,6 +330,10 @@ void SearchAdjacent(Graph* G, int n, int a, int* color, int* j)
 		Q[0] = NULL;
 		for (k = 1; Q[k] != NULL; Q[k - 1] = Q[k], Q[k] = NULL, k++);//сдвиг элементов в Q
 		Adjacent* A = u->head;
+		if (*j != 0) {
+			if (a == 0)
+				printf(" %s\n", u->name);
+		}
 		if (A != NULL)
 			for (k = 0; k < u->count; k++) {//обработка всех смежных вершин
 				p = FindVertex(G, A->Verb->name);
@@ -340,10 +345,6 @@ void SearchAdjacent(Graph* G, int n, int a, int* color, int* j)
 				A = A->next;
 			}
 		color[FindVertex(G, u->name)] = -1;
-		if (*j != 0) {
-			if (a == 0)
-				printf(" %s\n", A->Verb->name);
-		}
 		(*j)++;
 	}
 	(*j)--;
@@ -430,16 +431,18 @@ int Search(Graph* G, char* filename)
 //считываем информацию из файла(если он существует)       +                  
 int Load(Graph* G, FILE* file)
 {
-	int i = 0, n;
-	char name[10];
+	int i = 0, n, k=-1;
+	char name[10] = {NULL};
 	char* Name;
-	fseek(file, sizeof(int), SEEK_SET);
 	fread(&G->size, sizeof(int), 1, file);
 	G->Vert = (Vertex*)calloc(G->size, sizeof(Vertex));
 	for (int i = 0; i < G->size; i++) {
 		Vertex* V = (Vertex*)calloc(1, sizeof(Vertex));
-		V->head = (Adjacent*)calloc(1, sizeof(Adjacent));
-		fread(&name, sizeof(char*), 1, file);
+		k = -1;
+		do {
+			k++;
+			fread(&name[k], sizeof(char), 1, file);
+		} while (name[k] != 0);
 		fread(&V->x, sizeof(int), 1, file);
 		fread(&V->y, sizeof(int), 1, file);
 		fread(&V->count, sizeof(int), 1, file);
@@ -447,10 +450,13 @@ int Load(Graph* G, FILE* file)
 		G->Vert[i] = V;
 	}
 	for (int i = 0; i < G->size; i++) {
-		Adjacent* A = G->Vert[i]->head;
-		if (G->Vert[i]->count != 0)
+		if (G->Vert[i]->count != 0) {
 			for (int j = 0; j < G->Vert[i]->count; j++) {
-				fread(&name, sizeof(char*), 1, file);
+				k = -1;
+				do {
+					k++;
+					fread(&name[k], sizeof(char), 1, file);
+				} while (name[k] != 0);
 				Name = _strdup(name);
 				if (AdjacencyСheck(G, i, FindVertex(G, Name)))  //проверка на существование связи
 					continue;
@@ -460,6 +466,7 @@ int Load(Graph* G, FILE* file)
 					CommunicationVerb(G, G->Vert[i], G->Vert[FindVertex(G, Name)]);
 				}
 			}
+		}
 	}
 	fclose(file);
 	return 1;
@@ -469,19 +476,21 @@ void Save(Graph* G, char* filename)
 {
 	FILE* file = fopen(filename, "w+b");
 	if (!file) return;
-	fseek(file, sizeof(int), SEEK_SET);
+	fseek(file, 0, SEEK_SET);
 	fwrite(&G->size, sizeof(int), 1, file);
 	for (int i = 0; i < G->size; i++) {
-		fwrite(G->Vert[i]->name, sizeof(char) * (strlen(G->Vert[i]->name) + 1), 1, file);
+		fwrite(G->Vert[i]->name, sizeof(char)*(strlen(G->Vert[i]->name) + 1), 1, file);
 		fwrite(&G->Vert[i]->x, sizeof(int), 1, file);
 		fwrite(&G->Vert[i]->y, sizeof(int), 1, file);
 		fwrite(&G->Vert[i]->count, sizeof(int), 1, file);
 	}
 	for (int i = 0; i < G->size; i++) {
-		Adjacent* A = G->Vert[i]->head;
-		for (int j = 0; j < G->Vert[i]->count; j++) {
-			fwrite(A->Verb->name, sizeof(char) * (strlen(A->Verb->name) + 1), 1, file);
-			A = A->next;
+		if (G->Vert[i]->head != NULL) {
+			Adjacent* A = G->Vert[i]->head;
+			for (int j = 0; j < G->Vert[i]->count; j++) {
+				fwrite(A->Verb->name, sizeof(char)*(strlen(A->Verb->name) + 1), 1, file);
+				A = A->next;
+			}
 		}
 	}
 	fclose(file);
@@ -498,7 +507,6 @@ Vertex* CreateVertex(Graph* G, int x, int y, char* name)
 	v->name = _strdup(name);
 	v->x = x;
 	v->y = y;
-	//v->head = (Adjacent*)calloc(1, sizeof(Adjacent));
 	for (i = 0; G->Vert[i] != NULL && i < G->size; i++);
 	if (i == G->size) {
 		G->Vert = (Vertex*)realloc(G->Vert, (G->size + 1) * sizeof(Vertex));
