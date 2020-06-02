@@ -131,7 +131,7 @@ int F1_Exit(Graph* G, char* filename) {
 //создание рандомного графа                 +
 void F2_Random(Graph* G)
 {
-	printf("\n  [CRATE RANDOM GRAPH]\n");
+	printf("\n  [CREATE RANDOM GRAPH]\n");
 	int V, E, flag = 0;
 	do {
 		if (flag)
@@ -165,7 +165,7 @@ void F3_AddVertex(Graph* G)
 //создание связи между вершинами            +
 void F4_AddCommunication(Graph* G)
 {
-	printf("\n   [CREAT COMMUNICATION]\n");
+	printf("\n   [CREATE COMMUNICATION]\n");
 	char* str;
 	int i = 0, V1, V2;
 	str = GetStr("Enter the vertexs'-1 name:");
@@ -197,7 +197,7 @@ void F4_AddCommunication(Graph* G)
 //удаление вершины                          +
 void F5_DeleteVert(Graph* G)
 {
-	printf("\n   [DELET VERTEX]\n");
+	printf("\n   [DELETE VERTEX]\n");
 	if (CheckGraph(G))
 		return 0;
 	char* name;
